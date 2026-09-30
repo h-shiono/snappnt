@@ -40,6 +40,7 @@ testpaths = ["tests"]
 markers = [
     "icd: checks against values printed in an ICD",
     "loopback: simulator -> acquisition -> truth comparison",
+    "slow: long Monte Carlo runs, skipped unless selected with -m slow",
 ]
 
 [tool.ruff]
