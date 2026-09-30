@@ -1,6 +1,6 @@
 """snappnt: snapshot PNT receiver toolkit for low-cost front ends.
 
-Layers (see docs/architecture.md):
+Layers (see docs/design/architecture.md):
   signals   what signal to receive (carrier, chip rate, spreading codes)
   frontend  how it is received (device limits, frequency plan)
   io        how data moves between layers (SigMF files, device I/O)

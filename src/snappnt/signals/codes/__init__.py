@@ -2,7 +2,7 @@
 
 ``get_code(spec, prn)`` returns the primary code of one period as +/-1 int8.
 To add a signal: write a generator, register it in ``_REGISTRY`` under the ``code_family``
-used in the catalog YAML, and add an ICD check test (see docs/architecture.md).
+used in the catalog YAML, and add an ICD check test (see docs/design/architecture.md).
 """
 
 from __future__ import annotations

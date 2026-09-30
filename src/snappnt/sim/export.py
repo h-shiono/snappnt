@@ -1,7 +1,7 @@
 """Write simulator output in the formats signal generators play back.
 
 These functions only write files. Transmitting is always a manual step done by a person
-with cables and attenuators in place (docs/conducted-test.md); nothing in snappnt starts
+with cables and attenuators in place (docs/guides/conducted-test.md); nothing in snappnt starts
 a transmission on its own.
 
 Loop playback: generators repeat the file, so its length should be a whole number of data

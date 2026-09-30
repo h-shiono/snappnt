@@ -1,0 +1,67 @@
+site_name: snappnt
+site_description: Snapshot PNT receiver toolkit for low-cost front ends
+repo_url: https://github.com/h-shiono/snappnt
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 snappnt contributors. BSD-2-Clause.
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Design:
+      - Architecture: design/architecture.md
+  - Guides:
+      - Conducted test: guides/conducted-test.md
+  - Results:
+      - results/index.md
+  - Project:
+      - Milestones: project/milestones.md
+      - Decision log: project/decisions.md
+  - Development:
+      - Contributing and workflow: development/workflow.md
+      - Agent orchestration: development/orchestration.md
+      - Public-safety rules: development/public-safety.md

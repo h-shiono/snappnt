@@ -43,7 +43,7 @@ src/snappnt/
   rx/        snapshot acquisition (works for snapshots shorter than one code period)
   eval/      detection probability vs C/N0, truth comparison
 scenarios/   example scenarios
-docs/        design notes (Japanese)
+docs/        MkDocs site (mkdocs serve to browse locally)
 ```
 
 ## Spreading-code verification
@@ -54,11 +54,16 @@ independently of the generator:
 - NavIC L5/S SPS PRN 1–14: IRNSS SIS ICD for SPS v1.1, Table 7 (first 10 chips, octal)
 - GPS L1 C/A PRN 1–10: IS-GPS-200, Table 3-Ia
 
+## Documentation
+
+The `docs/` directory is an MkDocs site. Build it with `pip install -e ".[docs]"` and
+`mkdocs serve`. It will be published on GitHub Pages when the repository becomes public.
+
 ## Safety
 
 snappnt never transmits. It writes playback files and builds command lines for a person to
 review. Conducted tests must use cables and attenuators only — no antennas on generators.
-See `docs/conducted-test.md`.
+See `docs/guides/conducted-test.md`.
 
 ## License
 

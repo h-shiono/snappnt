@@ -1,0 +1,42 @@
+# Deploys the documentation site to GitHub Pages.
+#
+# Manual only. GitHub Pages sites are public even when the repository is private, so this
+# workflow must not run before the repository is published (docs/project/decisions.md, D-007).
+# When the repository goes public: enable Pages with "GitHub Actions" as the source, then run
+# this workflow by hand. Adding a push trigger is a separate decision at that time.
+name: docs-deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[docs]"
+      - run: mkdocs build --strict
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

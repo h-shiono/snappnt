@@ -24,6 +24,8 @@ jobs:
         run: |
           ruff check .
           ruff format --check .
+      - name: Public-safety check
+        run: python tools/check_public_safety.py
       - name: ICD checks (spreading codes against printed tables)
         run: pytest -m icd -q
       - name: Loopback (simulator -> acquisition -> truth)
@@ -35,3 +37,16 @@ jobs:
           snappnt info
           snappnt sim scenarios/navic_s_esp32c3.yaml -o out/ci_c3
           snappnt acquire out/ci_c3 --prn 10 --freq-span 40000
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: python -m pip install -e ".[docs]"
+      - name: Build documentation (strict)
+        run: mkdocs build --strict
