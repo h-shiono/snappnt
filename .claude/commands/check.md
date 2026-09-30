@@ -1,13 +1,17 @@
 ---
-description: 静的検査・整形確認・全試験を実行し、結果を報告する
+description: Run lint, format check, tests, docs build and the public-safety check, then report
 ---
 
-次を順に実行し、失敗があれば原因と直し方を報告してください。コードは勝手に直さず、まず報告します。
+Run these in order. If anything fails, report the cause and how to fix it. Do not change code
+before reporting.
 
 1. `ruff check .`
 2. `ruff format --check .`
-3. `pytest -m icd -q`（拡散符号とICDの表の照合）
-4. `pytest -m loopback -q`（シミュレータ→捕捉→正解照合）
-5. `pytest -q`（全体）
+3. `pytest -m icd -q` (spreading codes against values printed in ICDs)
+4. `pytest -m loopback -q` (simulate -> acquire -> compare with truth)
+5. `pytest -q` (everything)
+6. `mkdocs build --strict`
+7. `python tools/check_public_safety.py`
 
-報告には、失敗した試験名、期待値と実際の値、関係するファイルを含めてください。
+For each failure, give the test or check name, the expected and actual values, and the files
+involved.

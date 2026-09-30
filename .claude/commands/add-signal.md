@@ -1,14 +1,23 @@
 ---
-description: 新しい信号（システム・帯域）を追加する手順
+description: Steps for adding a new signal (system and band)
 argument-hint: <signal name, e.g. navic_l1_sps>
 ---
 
-信号 `$ARGUMENTS` を追加します。次の順で進め、各段階で何を根拠にしたかを報告してください。
+Add the signal `$ARGUMENTS`. Follow these steps and report what each step was based on.
 
-1. **根拠となる文書を確認する。** ICDの名称・版・該当する表の番号を特定し、ユーザーに提示する。ICDが非公開なら、その旨を伝え、仮の符号（`random:` 系）で進めてよいか確認する。
-2. **カタログを書く。** `src/snappnt/signals/catalog/$ARGUMENTS.yaml` に、搬送波周波数・チップレート・符号長・変調・データのシンボルレート・パイロットの有無・PRN範囲・出典（`source`）を書く。YAMLの数値は小数点付きで書く（例 `2492028000.0`）。
-3. **符号生成器を書く。** `src/snappnt/signals/codes/` に生成器を追加し、`codes/__init__.py` の `_REGISTRY` に `code_family` 名で登録する。LFSRを使う場合は `codes/lfsr.py` の約束（初期値は出力される順に書く）に合わせる。
-4. **ICD照合試験を書く。** `tests/test_codes_<system>.py` に、ICDに印刷された値（先頭チップの8進表記など）を書き写して照合する。期待値を生成器の出力から作ってはいけない。`@pytest.mark.icd` を付ける。
-5. **一巡試験を足す。** 必要なら `scenarios/` にシナリオを追加し、`tests/test_loopback.py` に捕捉と正解照合の試験を追加する。
-6. **決定を記録する。** 仮の値や判断があれば `docs/decisions.md` に追記する。
-7. `/check` を実行して全試験が通ることを確認する。
+1. **Find the source document.** Identify the ICD: title, version, and the table numbers that
+   define the signal and its codes. Show them to the maintainer. If no public ICD exists, say
+   so and ask whether to continue with a placeholder code (`random:` code family).
+2. **Write the catalog entry** `src/snappnt/signals/catalog/$ARGUMENTS.yaml`: carrier frequency,
+   chip rate, code length, modulation, data symbol rate, pilot or not, PRN range, and `source`.
+   Write numbers with a decimal point (for example `2492028000.0`).
+3. **Write the code generator** in `src/snappnt/signals/codes/` and register it in `_REGISTRY` in
+   `codes/__init__.py` under its `code_family` name. Shift-register codes follow the conventions
+   in `codes/lfsr.py` (initial state written in output order).
+4. **Write the ICD check test** `tests/test_codes_<system>.py`: type in values printed in the ICD
+   (for example the first chips in octal) and compare. Never derive expected values from the
+   generator. Mark the test `@pytest.mark.icd`.
+5. **Add a loopback test** if useful: a scenario in `scenarios/` and a test in
+   `tests/test_loopback.py` that acquires it and compares with truth.
+6. **Record decisions** and placeholder values in `docs/project/decisions.md`.
+7. Run `/check`.

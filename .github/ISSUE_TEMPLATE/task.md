@@ -1,31 +1,31 @@
 ---
-name: 作業
-about: Claude Code または人が進める作業の単位
+name: Task
+about: A unit of work for an agent or a person
 title: ""
 labels: []
 ---
 
-## 背景
+## Background
 
-<!-- なぜこの作業が必要か。前提となる事実と、その出典 -->
+<!-- Why the work is needed. The facts it relies on, with sources. -->
 
-## やること
+## Tasks
 
 1.
 
-## 受け入れ条件
+## Acceptance criteria
 
-<!-- 試験や文書など、完了を確かめられる形で書く -->
+<!-- Tests, documents or measurements that show the work is done. -->
 -
 
-## 止まる条件（当たったら作業を止めて、このIssueにコメントで報告）
+## Stop conditions (stop and report in this issue when one is hit)
 
 -
 
-## 触ってよい範囲
+## Allowed scope
 
-<!-- 変更してよいディレクトリやファイル -->
+<!-- Directories and files that may change. -->
 
-## 依存
+## Dependencies
 
-<!-- 先に終わっている必要があるIssue。なければ「なし」 -->
+<!-- Issues that must be closed first, or "None". -->

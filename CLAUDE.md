@@ -1,92 +1,94 @@
 # CLAUDE.md
 
-このファイルは、このリポジトリで作業するClaude Code向けの指示です。人間の開発者が読んでも分かるように書いています。
+Instructions for Claude Code working in this repository. People can read it too.
 
-## プロジェクトの目的
+**Before starting any task, read:**
 
-snappnt は、安価な受信フロントエンド（ESP32のESP-SDR、HackRF、USRP）で衛星測位信号を「短時間だけ取り込み、後から捕捉する」ための道具一式です。シミュレータと受信処理を同じリポジトリに置き、シミュレータが仕込んだ正解と受信結果を自動で照合できるようにしています。
+- [docs/development/orchestration.md](docs/development/orchestration.md) — roles, status labels, when to stop and escalate
+- [docs/development/workflow.md](docs/development/workflow.md) — issue steps and writing style
+- [docs/development/public-safety.md](docs/development/public-safety.md) — what must never be recorded
 
-- 最初の対象：NavIC S帯 SPS（2492.028 MHz、BPSK(1)、ICD公開）
-- 将来の対象：C帯LEO-PNT（5010–5030 MHz、外部ミキサで2.4 GHz帯へ変換）ほか
+## Project
 
-## コマンド
+snappnt receives satellite navigation signals with low-cost radios (ESP32 via ESP-SDR, HackRF,
+USRP) by capturing short snapshots and processing them afterwards. The simulator and the
+receiver processing live in one repository so that results can be compared with the
+simulator's truth automatically.
+
+- First target: NavIC S-band SPS (2492.028 MHz, BPSK(1), public ICD).
+- Later targets: C-band LEO-PNT (5010–5030 MHz, down-converted to 2.4 GHz with an external
+  mixer) and others.
+
+## Commands
 
 ```bash
-pip install -e ".[dev]"          # 開発用インストール（ハードウェアを使うときは ".[dev,hw]"）
-pytest -q                        # 全試験
-pytest -m icd -q                 # ICDの表との照合だけ
-pytest -m loopback -q            # シミュレータ→捕捉→正解照合の一巡試験だけ
-ruff check . && ruff format .    # 静的検査と整形
-snappnt info                     # 登録済みの信号と機材
+pip install -e ".[dev,docs]"     # add ",hw" to talk to hardware
+pytest -q                        # all tests
+pytest -m icd -q                 # spreading codes against values printed in ICDs
+pytest -m loopback -q            # simulate -> acquire -> compare with truth
+ruff check . && ruff format .    # lint and format
+mkdocs build --strict            # documentation site
+python tools/check_public_safety.py
+snappnt info
 snappnt sim scenarios/navic_s_esp32c3.yaml -o out/c3
 snappnt acquire out/c3 --prn 10 --freq-span 40000
 snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 48:60:2 --trials 20 -o out/pd.csv
 ```
 
-変更を終えたら、必ず `ruff check .`、`ruff format --check .`、`pytest -q` を通してください。
+Before finishing any change, all of these must pass: `ruff check .`, `ruff format --check .`,
+`pytest -q`, `mkdocs build --strict`, `python tools/check_public_safety.py`.
 
-## 構成（詳しくは docs/architecture.md）
+## Layout (details in docs/design/architecture.md)
 
-| 場所 | 役割 |
+| Path | Contents |
 |---|---|
-| `src/snappnt/signals/` | どの信号を受けるか。`catalog/*.yaml` にパラメータ、`codes/` に拡散符号の生成器 |
-| `src/snappnt/frontend/` | どう受けるか。`devices/*.yaml` に機材の制約、`freqplan.py` にミキサを含む周波数配置 |
-| `src/snappnt/io/` | 層の間のデータ受け渡し。SigMF、ESP-SDRの32ビット語、発生器のコマンド組み立て |
-| `src/snappnt/sim/` | 正解付きの信号を作る。シナリオ、劣化（量子化・水晶ずれ・取り込み長）、再生用ファイル |
-| `src/snappnt/rx/` | 捕捉。1周期より短い取り込みにも対応した並列コード探索 |
-| `src/snappnt/eval/` | 捕捉確率とC/N0の関係、正解との照合 |
-| `scenarios/` | 試験条件のYAML |
-| `docs/` | 設計、有線試験の手順、決定記録、マイルストーン |
+| `src/snappnt/signals/` | What is received: `catalog/*.yaml` parameters, `codes/` spreading-code generators |
+| `src/snappnt/frontend/` | How it is received: `devices/*.yaml` hardware limits, `freqplan.py` mixer frequency plans |
+| `src/snappnt/io/` | Data between layers: SigMF, ESP-SDR 32-bit words, generator command builders |
+| `src/snappnt/sim/` | Snapshots with known truth: scenarios, impairments, playback files |
+| `src/snappnt/rx/` | Acquisition, including snapshots shorter than one code period |
+| `src/snappnt/eval/` | Detection probability versus C/N0, comparison with truth |
+| `scenarios/` | Scenario YAML files |
+| `docs/` | MkDocs site: design, guides, results, project records, development rules |
+| `tools/` | Helper scripts (public-safety check, benchmarks, plotting) |
 
-## 守るべき規約
+## Conventions
 
-1. **単位は変数名に付ける。** `_hz`、`_s`、`_sps`、`_dbhz`、`_chips`、`_ppm` など。単位はSI（周波数はHz、時間は秒）。
-2. **符号は ±1 の int8。** ビットとの対応は 0 → +1、1 → −1（GNSSの慣例）。
-3. **複素ベースバンドは complex64。** 雑音は1サンプルあたり分散1で、N0 = 1/fs とする（`sim/generate.py` 冒頭の説明を参照）。
-4. **コード位相は「取り込み先頭サンプルでのチップ位置」。** 周波数ずれは「周波数配置で決まる中心（baseband_offset_hz）からの差」。シミュレータの正解とrxの出力はこの定義で揃える。
-5. **新しい信号を追加するときは、ICDとの照合試験を必ず付ける。** ICDに印刷された値（先頭チップの8進表記など）を、生成器とは独立に試験ファイルへ書き写す。生成器の出力から期待値を作ってはいけない。ICDが非公開の信号は `random:` 系の仮の符号を使い、YAMLの `source` に仮であることを書く。
-6. **送信は絶対に自動で行わない。** `hackrf_transfer` や `tx_samples_from_file` を実行しない（`.claude/settings.json` で禁止済み）。snappnt は再生用のファイルとコマンド文字列を作るところまで。送信は人が、ケーブルとアッテネータで閉じた経路を確認してから行う（docs/conducted-test.md）。
-7. **大きなデータはコミットしない。** `out/` と `data/` 以下のSigMFや再生用ファイルは .gitignore 済み。試験は小さなシナリオをその場で生成して使う。
+1. **Units in names.** `_hz`, `_s`, `_sps`, `_dbhz`, `_chips`, `_ppm`. SI units.
+2. **Codes are ±1 int8.** Bit 0 → +1, bit 1 → −1 (the GNSS convention).
+3. **Complex baseband is complex64.** Noise has unit variance per sample, so N0 = 1/fs (see the
+   docstring of `sim/generate.py`).
+4. **Code phase** is the chip position at the first sample of the snapshot. **Frequency offset**
+   is measured from the centre set by the frequency plan (`baseband_offset_hz`). The simulator's
+   truth and the acquisition output use these same definitions.
+5. **Every new signal gets an ICD check test.** Type values printed in the ICD (for example the
+   first chips in octal) into the test, independently of the generator. Never derive expected
+   values from the generator. For signals without a public ICD, use a `random:` code family and
+   say so in the YAML `source` field.
+6. **Never transmit.** Do not run `hackrf_transfer`, `tx_samples_from_file` or similar
+   (denied in `.claude/settings.json`). snappnt writes playback files and command strings only.
+   A person transmits, after checking the path is closed with cables and attenuators
+   (docs/guides/conducted-test.md).
+7. **No large data in git.** `out/` and `data/` are ignored. Tests generate small scenarios on
+   the fly.
 
-## 文章の書き方（コード内コメント、docs、コミットメッセージ、Claudeの返答すべて）
+## Records
 
-- docs と返答は日本語、コード内のコメントとdocstringは英語。
-- **英語を直訳した造語を作らない。** 定着した用語（捕捉、追尾、コード位相、C/N0 など）を使い、定着した訳語がない概念は、その場で短い説明を添える。
-- **要約を重ねて情報を圧縮しない。** 前に書いたことを縮めた言い回しで参照せず、必要なら何を指すかを書き直す。読み手が過去の文脈を覚えている前提にしない。
-- 未確認の値は `TODO` と「何を確認すれば決まるか」を書く。推測を確定値のように書かない。
-- 設計上の判断をしたら `docs/decisions.md` に1項目追加する（何を決めたか、なぜか、他の選択肢）。
+- **Everything committed or posted to GitHub is in English**: code comments, docstrings,
+  documentation, commit messages, issues, pull requests, review replies. Chat replies to the
+  maintainer may follow the language the maintainer uses.
+- Follow the writing style in docs/development/workflow.md: established terms only, no invented
+  terms, no compressed back-references, each page stands on its own, facts separated from
+  assumptions.
+- Design decisions go into `docs/project/decisions.md`. Results go into `docs/results/`, and
+  each new page is added to the `nav` in `mkdocs.yml`.
+- Nothing personal, location-specific or machine-specific is ever recorded
+  (docs/development/public-safety.md).
 
-## Issueの進め方
+## Open questions (update when settled)
 
-作業はGitHubのIssue単位で行う。各Issueには「受け入れ条件」「止まる条件」「触ってよい範囲」が書いてある。
-
-### ラベルの意味
-
-| ラベル | 意味 |
-|---|---|
-| `auto` | 試験で合否を判定できるので、Claudeが進めてよい |
-| `research` | 調査が主。結果は文書またはIssueのコメントにまとめる |
-| `needs-hardware` | 実機や人の作業が必要。Claudeは準備（コード、手順、ダミーを使った試験）までを行い、実機での確認は人に渡す |
-| `needs-decision` | 人の判断が必要。Claudeは判断材料をまとめ、判断はしない |
-
-### 手順
-
-1. **計画を先に出す。** 着手前に、Issueへのコメントで計画を示す。内容は、変更するファイル、追加する試験、受け入れ条件をどう満たすか、不明な点。人の承認を得てから実装する。
-2. **ブランチを切る。** 名前は `issue-<番号>-<短い説明>`（例 `issue-5-acquire-speed`）。`main` に直接コミットしない。
-3. **1つのPRは1つのIssue（1つの論点）に絞る。** 途中で別の問題を見つけたら、直さずに新しいIssueの案としてコメントに書く。
-4. **止まる条件に当たったら、作業を止めてIssueにコメントで報告する。** 自分の判断で範囲を広げない。
-5. **PRを出す前に** `ruff check .`、`ruff format --check .`、`pytest -q` を通す。
-6. **PR説明は日本語で、テンプレート（`.github/pull_request_template.md`）の項目を埋める。** 特に「なぜそうしたか」「他に考えた案」「未検証の点」を省かない。
-7. **マージは人が行う。** Claudeはマージしない。
-
-### マイルストーンの区切り
-
-マイルストーンのIssueがすべて閉じたら、その段階で分かったことを `docs/` に1ページまとめる（例 `docs/summary-m2.md`）。読んだ人が、前の文書を読み返さなくても内容を説明できるように書く。
-
-## 未確定事項（作業中に確定したら更新すること）
-
-- ESP-SDRファームウェアのライセンス（フォーク前に確認）
-- ESP32-C3の1回あたりの最大取り込みサンプル数（`frontend/devices/esp32c3.yaml` は仮に16384）
-- ESP-SDRのチューニング・取り込みコマンドの正確な書式と、ホストへの転送形式（`io/espsdr_client.py`）
-- C61の低サンプルレートが「クロック分周のみ（帯域制限なし）」かどうか（雑音の折り返し損失に直結）
-- B206mini-i の仕様（`frontend/devices/b206mini_i.yaml`）
+- ESP-SDR firmware licence (before any fork) — issue #7
+- Maximum samples per capture on ESP32-C3 (`frontend/devices/esp32c3.yaml` assumes 16384) — issue #11
+- Exact ESP-SDR tuning and capture commands and host transfer format (`io/espsdr_client.py`) — issue #6
+- Whether low sample rates on ESP32-C61 are clock division only, without band limiting — issues #3 and #13
+- Reference receiver specifications (`frontend/devices/b206mini_i.yaml`)

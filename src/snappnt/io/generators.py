@@ -1,7 +1,7 @@
 """Build (never run) playback commands for signal generators.
 
 The commands are returned as lists for a person to review and run by hand, with the RF
-path closed by cables and attenuators. See docs/conducted-test.md.
+path closed by cables and attenuators. See docs/guides/conducted-test.md.
 """
 
 from __future__ import annotations

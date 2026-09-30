@@ -11,7 +11,9 @@
       "Bash(pip install -e:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(mkdocs build:*)",
+      "Bash(python tools/check_public_safety.py:*)"
     ],
     "deny": [
       "Bash(hackrf_transfer:*)",

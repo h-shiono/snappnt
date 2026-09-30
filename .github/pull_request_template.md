@@ -1,26 +1,28 @@
-## 対応するIssue
+## Issue
 
 Closes #
 
-## 何を変えたか
+## What changed
 
-<!-- 変更の内容を、ファイル単位ではなく「何ができるようになったか」で書く -->
+<!-- What can be done now that could not be done before. Not a file-by-file list. -->
 
-## なぜそうしたか
+## Why
 
-<!-- 設計上の判断があれば docs/decisions.md にも追記する -->
+<!-- Design decisions also go into docs/project/decisions.md. -->
 
-## 他に考えた案
+## Alternatives considered
 
-<!-- 採らなかった案と、採らなかった理由 -->
+<!-- Options not taken, and why. -->
 
-## 確認したこと
+## Checks
 
 - [ ] `ruff check .`
 - [ ] `ruff format --check .`
 - [ ] `pytest -q`
-- [ ] Issueの受け入れ条件（項目ごとに、どう確かめたかを書く）
+- [ ] `mkdocs build --strict`
+- [ ] `python tools/check_public_safety.py`
+- [ ] Acceptance criteria (for each one, how it was verified)
 
-## 未検証の点
+## Not verified
 
-<!-- 実機での確認が必要な点、仮定を置いた点。なければ「なし」 -->
+<!-- Things that need hardware, and assumptions made. Write "Nothing" if none. -->

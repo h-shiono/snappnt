@@ -8,6 +8,7 @@ build/
 dist/
 .pytest_cache/
 .ruff_cache/
+site/
 
 # Generated data (keep the repository small)
 out/
