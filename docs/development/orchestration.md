@@ -102,8 +102,9 @@ For issues without `auto`, the orchestrator posts the same approval comment and 
 
 ## Escalation
 
-The orchestrator sets `status:blocked` and posts a comment that starts with
-**"[orchestrator] Maintainer needed:"** and says what exactly needs deciding and what the options are, when:
+The orchestrator sets `status:blocked` and posts a comment that starts with the author tag
+`**[orchestrator]**` on its own line, followed by **"Maintainer needed:"**, what exactly needs
+deciding, and what the options are, when:
 
 - The worker reports that it hit a stop condition from the issue.
 - A plan fails the approval rules and cannot be fixed by a simple request.
@@ -147,6 +148,18 @@ request that contains them does.
 
 Selected as the next issue. Worker: read CLAUDE.md and docs/development/orchestration.md,
 then post a plan here.
+```
+
+### Escalation
+
+```markdown
+**[orchestrator]**
+
+**Maintainer needed:** <what needs deciding>
+
+- Option A: <...>
+- Option B: <...>
+- Why this is escalated: <which escalation rule applies>
 ```
 
 ### Merge
