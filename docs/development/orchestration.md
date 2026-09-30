@@ -86,15 +86,19 @@ The orchestrator merges a pull request when **all** of these hold:
    build) has passed on the exact head commit being merged, and the branch has no conflict
    with `main`. The orchestrator relies on CI for this and never checks out or runs pull request
    code itself: its session holds a write-capable token, and CI runs without one.
-4. Greptile has completed a review of that same head commit, no Greptile finding is left
-   unanswered, and none that the orchestrator judges blocking is left unfixed.
+4. Greptile has completed a review of that same head commit (a review by `greptile-apps[bot]`
+   whose `commit_id` is the head commit), no Greptile finding is left unanswered, and none that
+   the orchestrator judges blocking is left unfixed. Greptile reviews every push automatically
+   (`.greptile/config.json`), so a missing review means waiting, not escalating.
 5. Each acceptance criterion in the issue has been checked, and the approval comment (below)
    says how.
 6. The pull request description lists what is still unverified, and each unverified item that
    needs hardware is tracked in an open issue.
 
 Merge method: squash merge, with the pull request title as the commit title, pinned to the
-head commit that was checked (`gh pr merge --squash --match-head-commit <sha>`).
+head commit that was checked (`gh pr merge --squash --match-head-commit <sha>`). After the
+merge the orchestrator removes the `status:*` label from the closed issue and, in the same
+run, selects the next issue.
 
 `auto` issues that also carry `needs-hardware` may be merged when the code is complete and
 tested with stand-ins (for example a fake serial port); the hardware check stays in its own

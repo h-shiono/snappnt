@@ -30,6 +30,20 @@ The hand-off between the two is event-driven. A typical issue:
 
 The hourly runs catch anything an event missed.
 
+Two details keep the hand-offs moving without the maintainer:
+
+- **Greptile reviews every push.** `.greptile/config.json` sets `autoReview` to
+  `["open", "push"]`, so each fix the worker pushes gets a new review, and the orchestrator can
+  require a review of the exact head commit before merging.
+- **Commits carry the maintainer's identity.** The action sets the git author itself
+  (`claude[bot]` by default). The worker workflow passes the repository owner as `bot_name` and
+  `bot_id`, so commits are authored with the owner's GitHub no-reply address and match the
+  `Signed-off-by` line required by the Developer Certificate of Origin.
+
+The token cannot read GitHub's check-runs API, so the orchestrator reads CI results from the
+Actions runs of the `ci` workflow and the Greptile review from the pull request's reviews
+(`commit_id`).
+
 ## Why a personal access token
 
 Events caused by the default `GITHUB_TOKEN` do not start other workflows (GitHub's rule to
