@@ -77,6 +77,9 @@ Before finishing any change, all of these must pass: `ruff check .`, `ruff forma
 - **Everything committed or posted to GitHub is in English**: code comments, docstrings,
   documentation, commit messages, issues, pull requests, review replies. Chat replies to the
   maintainer may follow the language the maintainer uses.
+- Every comment, review reply and pull request description you post starts with an author tag
+  on its own line: `**[worker]**` when working on an issue, `**[orchestrator]**` when acting as
+  the orchestrator (docs/development/orchestration.md, "Author tag").
 - Follow the writing style in docs/development/workflow.md: established terms only, no invented
   terms, no compressed back-references, each page stands on its own, facts separated from
   assumptions.
