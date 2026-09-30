@@ -1,0 +1,15 @@
+# Hypothetical C-band LEO-PNT signal. No public ICD exists; parameters are placeholders
+# chosen to exercise the pipeline (4 MHz main lobe, 1 ms code, pilot only).
+name: cband_bpsk_generic
+system: HYPOTHETICAL
+band: C
+carrier_hz: 5020000000.0     # centre of the 5010-5030 MHz RNSS allocation
+chip_rate_hz: 2046000.0      # BPSK(2): ~4 MHz null-to-null
+code_length: 2046
+modulation: BPSK
+code_family: "random:cband_bpsk_generic"
+prn_range: [1, 32]
+symbol_rate_hz: null
+pilot: true
+source: "none (hypothetical)"
+notes: "Stand-in until a real C-band ICD is available. LEO Doppler up to about +/-120 kHz."

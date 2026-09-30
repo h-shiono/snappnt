@@ -1,0 +1,12 @@
+# Software-only reference: 4 ms at 8.184 MSa/s, no quantization, no clock error.
+name: navic_s_ideal
+signal: navic_s_sps
+seed: 1
+receiver:
+  sample_rate_hz: 8184000
+  n_samples: 32736          # 4 ms
+  baseband_offset_hz: 0
+  clock_offset_ppm: 0
+  quantization_bits: null
+satellites:
+  - {prn: 10, cn0_dbhz: 45, doppler_hz: 0, code_phase_chips: 311.7}

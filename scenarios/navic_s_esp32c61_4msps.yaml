@@ -1,0 +1,12 @@
+# ESP32-C61 at 4 MSa/s, 16384 samples (~4 ms). Assumes an ideal decimating filter;
+# see sim.impairments.decimate_without_filter for the pessimistic alternative.
+name: navic_s_esp32c61_4msps
+signal: navic_s_sps
+seed: 3
+receiver:
+  device: esp32c61
+  sample_rate_hz: 4000000
+  n_samples: 16384
+  clock_offset_ppm: -8.0
+satellites:
+  - {prn: 10, cn0_dbhz: 42, doppler_hz: 0, code_phase_chips: 55.0}

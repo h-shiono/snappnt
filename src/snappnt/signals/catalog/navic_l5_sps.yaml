@@ -1,0 +1,14 @@
+# NavIC L5-band Standard Positioning Service (reference; ESP32 cannot tune here)
+name: navic_l5_sps
+system: NavIC
+band: L5
+carrier_hz: 1176450000.0
+chip_rate_hz: 1023000.0
+code_length: 1023
+modulation: BPSK
+code_family: navic_l5_sps
+prn_range: [1, 14]
+symbol_rate_hz: 50.0
+pilot: false
+min_received_power_dbw: -159.0
+source: "IRNSS SIS ICD for SPS v1.1 (ISRO, 2017), Table 7"

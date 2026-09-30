@@ -1,0 +1,7 @@
+# USRP B206mini-i. Reference receiver on the splitter's second port during conducted tests.
+name: b206mini_i
+kind: uhd
+role: reference_receiver
+tune_range_hz: [70000000, 6000000000]   # TODO: confirm from datasheet
+adc_bits: 12
+reference_input: "TODO: confirm"

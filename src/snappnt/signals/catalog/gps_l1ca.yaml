@@ -1,0 +1,14 @@
+# GPS L1 C/A (software-only reference for validating the code path)
+name: gps_l1ca
+system: GPS
+band: L1
+carrier_hz: 1575420000.0
+chip_rate_hz: 1023000.0
+code_length: 1023
+modulation: BPSK
+code_family: gps_l1ca
+prn_range: [1, 32]
+symbol_rate_hz: 50.0
+pilot: false
+min_received_power_dbw: -158.5
+source: "IS-GPS-200, Table 3-Ia"

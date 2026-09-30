@@ -1,0 +1,9 @@
+# OpenSourceSDRLab B210 clone (AD9361). Preferred generator: 12-bit DAC, fine power steps.
+name: b210_clone
+kind: uhd
+role: generator
+tune_range_hz: [70000000, 6000000000]
+sample_rates_sps: [1000000, 56000000]
+dac_bits: 12
+adc_bits: 12
+reference_input: "10 MHz + PPS"

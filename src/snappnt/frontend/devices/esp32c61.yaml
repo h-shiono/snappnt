@@ -1,0 +1,12 @@
+# ESP32-C61 via ESP-SDR (reference chip of ESPARGOS; supports low sample rates)
+name: esp32c61
+kind: espsdr
+role: receiver
+tune_range_hz: [2100000000, 2800000000]
+sample_rates_sps: [80000000, 40000000, 20000000, 10000000, 8000000, 4000000]
+adc_bits: 10
+analog_bandwidth_hz: [13000000, 54000000]
+max_capture_samples: 16384   # 64 KiB bank of 32-bit words; two banks form a ring buffer
+low_rate_method: "unknown"   # TODO: clock division without digital filter would fold noise
+transport: "USB Serial/JTAG (native)"
+source: "ESPARGOS esp-sdr README and docs/rx-controls.md (2026-09)"

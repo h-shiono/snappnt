@@ -1,0 +1,8 @@
+name: hackrf_one
+kind: hackrf
+role: generator
+tune_range_hz: [1000000, 6000000000]
+sample_rates_sps: [2000000, 20000000]    # continuous range
+dac_bits: 8
+reference_input: "10 MHz CLKIN"
+safety: "always -a 0 (amp off) and -p 0 (antenna port power off); cable + attenuators only"

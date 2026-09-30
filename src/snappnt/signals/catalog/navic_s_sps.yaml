@@ -1,0 +1,15 @@
+# NavIC S-band Standard Positioning Service
+name: navic_s_sps
+system: NavIC
+band: S
+carrier_hz: 2492028000.0
+chip_rate_hz: 1023000.0
+code_length: 1023
+modulation: BPSK
+code_family: navic_s_sps
+prn_range: [1, 14]
+symbol_rate_hz: 50.0        # 25 bit/s, rate-1/2 FEC
+pilot: false
+min_received_power_dbw: -162.3
+source: "IRNSS SIS ICD for SPS v1.1 (ISRO, 2017), Table 7"
+notes: "Primary target for the ESP32 2.4 GHz front end (no mixer needed)."

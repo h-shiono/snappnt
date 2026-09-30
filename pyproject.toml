@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "snappnt"
+version = "0.0.1"
+description = "Snapshot PNT receiver toolkit for low-cost front ends (ESP32 ESP-SDR, HackRF, USRP): signal simulator and acquisition"
+readme = "README.md"
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "TODO: author name" }]
+keywords = ["GNSS", "PNT", "NavIC", "LEO-PNT", "SDR", "ESP32", "snapshot receiver"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+hw = ["pyserial>=3.5"]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+snappnt = "snappnt.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/snappnt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "icd: checks against values printed in an ICD",
+    "loopback: simulator -> acquisition -> truth comparison",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "NPY"]

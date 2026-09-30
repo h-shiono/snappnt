@@ -1,0 +1,203 @@
+"""Command line: ``snappnt <command> ...``
+
+codes    print code properties (first chips in ICD octal form)
+sim      scenario YAML -> SigMF (+ optional generator playback file)
+acquire  SigMF -> acquisition table (and truth comparison if present)
+sweep    scenario YAML -> detection probability vs C/N0 (CSV)
+info     list signals and devices
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+import numpy as np
+
+
+def _parse_range(text: str) -> list[float]:
+    """'40:60:2' -> [40, 42, ..., 60]; '45,50' -> [45, 50]."""
+    if ":" in text:
+        a, b, s = (float(v) for v in text.split(":"))
+        return list(np.arange(a, b + s / 2, s))
+    return [float(v) for v in text.split(",")]
+
+
+def _parse_prns(text: str) -> list[int]:
+    out: list[int] = []
+    for part in text.split(","):
+        if "-" in part:
+            a, b = part.split("-")
+            out += list(range(int(a), int(b) + 1))
+        else:
+            out.append(int(part))
+    return out
+
+
+def cmd_info(_: argparse.Namespace) -> int:
+    from snappnt.frontend import list_devices
+    from snappnt.signals import list_signals, load_signal
+
+    print("signals:")
+    for name in list_signals():
+        s = load_signal(name)
+        print(f"  {name:22s} {s.carrier_hz / 1e6:10.3f} MHz  {s.chip_rate_hz / 1e6:.3f} Mcps")
+    print("devices:")
+    for name in list_devices():
+        print(f"  {name}")
+    return 0
+
+
+def cmd_codes(a: argparse.Namespace) -> int:
+    from snappnt.signals import get_code, load_signal
+    from snappnt.signals.codes.lfsr import first_chips_octal
+
+    spec = load_signal(a.signal)
+    prns = _parse_prns(a.prn) if a.prn else list(spec.prns())
+    for prn in prns:
+        c = get_code(spec, prn)
+        octal = first_chips_octal(c)
+        print(f"PRN {prn:3d}  length {c.size}  first10(octal) {octal}  sum {int(c.sum()):+d}")
+    return 0
+
+
+def cmd_sim(a: argparse.Namespace) -> int:
+    from snappnt.io import write_sigmf
+    from snappnt.signals import load_signal
+    from snappnt.sim import generate, load_scenario
+    from snappnt.sim.export import write_hackrf_int8, write_uhd_sc16
+
+    scn = load_scenario(a.scenario)
+    x, truth = generate(scn)
+    spec = load_signal(scn.signal)
+    out = Path(a.output or f"out/{scn.name}")
+    base = write_sigmf(
+        out,
+        x,
+        scn.receiver.sample_rate_hz,
+        center_frequency_hz=spec.carrier_hz - scn.receiver.baseband_offset_hz,
+        description=f"snappnt simulation: {scn.name}",
+        truth=truth,
+    )
+    print(f"wrote {base}.sigmf-meta / .sigmf-data  ({x.size} samples)")
+    if a.hackrf:
+        p = write_hackrf_int8(x, base.with_name(base.name + ".hackrf.i8"))
+        print(f"wrote {p}  (hackrf_transfer -t, int8 I/Q)")
+    if a.uhd:
+        p = write_uhd_sc16(x, base.with_name(base.name + ".uhd.sc16"))
+        print(f"wrote {p}  (tx_samples_from_file --type short)")
+    return 0
+
+
+def cmd_acquire(a: argparse.Namespace) -> int:
+    from snappnt.eval import is_correct
+    from snappnt.io import get_truth, read_sigmf
+    from snappnt.rx import acquire
+    from snappnt.signals import load_signal
+
+    x, meta = read_sigmf(a.file)
+    fs = float(meta["global"]["core:sample_rate"])
+    truth = get_truth(meta)
+    signal = a.signal or (truth or {}).get("signal")
+    if not signal:
+        print("error: --signal is required (no truth annotation to read it from)", file=sys.stderr)
+        return 2
+    spec = load_signal(signal)
+    center = (truth or {}).get("baseband_offset_hz", 0.0) if a.center is None else a.center
+    prns = _parse_prns(a.prn) if a.prn else list(spec.prns())
+    truth_by_prn = {s["prn"]: s for s in (truth or {}).get("satellites", [])}
+
+    print(f"{spec.name}: {x.size} samples at {fs / 1e6:g} MSa/s ({x.size / fs * 1e3:.3f} ms)")
+    print(" PRN  det  code[chip]   freq[Hz]   metric  thr    C/N0est  truth")
+    for prn in prns:
+        r = acquire(
+            x, fs, spec, prn,
+            center_offset_hz=center,
+            freq_range_hz=(-a.freq_span, a.freq_span),
+            n_blocks=a.blocks,
+            pfa=a.pfa,
+        )  # fmt: skip
+        t = truth_by_prn.get(prn)
+        mark = ""
+        if t is not None:
+            mark = "OK" if r.detected and is_correct(r, t, spec.code_length, 0.5) else "--"
+        print(
+            f" {prn:3d}  {'yes' if r.detected else ' no'}  {r.code_phase_chips:9.2f}  "
+            f"{r.freq_offset_hz:9.0f}  {r.metric:7.1f}  {r.threshold:5.1f}  "
+            f"{r.cn0_dbhz_est:6.1f}   {mark}"
+        )
+    return 0
+
+
+def cmd_sweep(a: argparse.Namespace) -> int:
+    from snappnt.eval import sweep, write_csv
+    from snappnt.sim import load_scenario
+
+    scn = load_scenario(a.scenario)
+    pts = sweep(
+        scn,
+        _parse_range(a.cn0),
+        a.trials,
+        freq_range_hz=(-a.freq_span, a.freq_span),
+        n_blocks=a.blocks,
+        pfa=a.pfa,
+        seed=a.seed,
+    )
+    print(" C/N0   Pd     Pwrong  metric")
+    for p in pts:
+        print(f" {p.cn0_dbhz:5.1f}  {p.p_detect:5.2f}  {p.p_wrong:5.2f}  {p.mean_metric:7.2f}")
+    if a.output:
+        print(f"wrote {write_csv(pts, a.output)}")
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="snappnt", description=__doc__.split("\n")[0])
+    sub = p.add_subparsers(dest="command", required=True)
+
+    s = sub.add_parser("info", help="list signals and devices")
+    s.set_defaults(func=cmd_info)
+
+    s = sub.add_parser("codes", help="print spreading-code properties")
+    s.add_argument("--signal", default="navic_s_sps")
+    s.add_argument("--prn", help="e.g. 1-14 or 1,5,9 (default: all)")
+    s.set_defaults(func=cmd_codes)
+
+    s = sub.add_parser("sim", help="generate a snapshot from a scenario")
+    s.add_argument("scenario")
+    s.add_argument("-o", "--output", help="output base path (default out/<scenario name>)")
+    s.add_argument("--hackrf", action="store_true", help="also write int8 file for hackrf_transfer")
+    s.add_argument("--uhd", action="store_true", help="also write sc16 file for UHD playback")
+    s.set_defaults(func=cmd_sim)
+
+    for name, func, helptext in (
+        ("acquire", cmd_acquire, "acquire PRNs in a SigMF recording"),
+        ("sweep", cmd_sweep, "detection probability vs C/N0"),
+    ):
+        s = sub.add_parser(name, help=helptext)
+        if name == "acquire":
+            s.add_argument("file", help="SigMF base path, .sigmf-meta or .sigmf-data")
+            s.add_argument("--signal")
+            s.add_argument("--prn")
+            s.add_argument("--center", type=float, help="carrier offset in baseband [Hz]")
+        else:
+            s.add_argument("scenario")
+            s.add_argument("--cn0", default="40:60:2", help="start:stop:step or list [dB-Hz]")
+            s.add_argument("--trials", type=int, default=20)
+            s.add_argument("--seed", type=int, default=0)
+            s.add_argument("-o", "--output", help="CSV path")
+        s.add_argument("--freq-span", type=float, default=50e3, help="search +/- [Hz]")
+        s.add_argument("--blocks", type=int, default=1, help="non-coherent blocks")
+        s.add_argument("--pfa", type=float, default=1e-3)
+        s.set_defaults(func=func)
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    return int(args.func(args) or 0)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

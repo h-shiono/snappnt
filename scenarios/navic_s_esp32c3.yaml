@@ -1,0 +1,13 @@
+# XIAO ESP32C3 conditions (M2): 80 MSa/s, one 64 KiB bank (~0.2 ms), 10-bit ADC,
+# crystal error 12 ppm (about -30 kHz at 2492 MHz). Needs high C/N0 because the snapshot
+# is only a fifth of a code period.
+name: navic_s_esp32c3
+signal: navic_s_sps
+seed: 2
+receiver:
+  device: esp32c3
+  baseband_offset_hz: 0
+  clock_offset_ppm: 12.0
+  agc_backoff_db: 12
+satellites:
+  - {prn: 10, cn0_dbhz: 58, doppler_hz: 0, code_phase_chips: 800.25}

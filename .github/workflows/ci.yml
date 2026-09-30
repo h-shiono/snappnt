@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: ICD checks (spreading codes against printed tables)
+        run: pytest -m icd -q
+      - name: Loopback (simulator -> acquisition -> truth)
+        run: pytest -m loopback -q
+      - name: All tests
+        run: pytest -q
+      - name: CLI smoke test
+        run: |
+          snappnt info
+          snappnt sim scenarios/navic_s_esp32c3.yaml -o out/ci_c3
+          snappnt acquire out/ci_c3 --prn 10 --freq-span 40000

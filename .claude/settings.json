@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(pytest:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(ruff check:*)",
+      "Bash(ruff format:*)",
+      "Bash(snappnt:*)",
+      "Bash(python -m snappnt:*)",
+      "Bash(pip install -e:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [
+      "Bash(hackrf_transfer:*)",
+      "Bash(tx_samples_from_file:*)",
+      "Bash(uhd_siggen:*)",
+      "Bash(uhd_siggen_gui:*)"
+    ]
+  }
+}

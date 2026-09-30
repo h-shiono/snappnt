@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Generated data (keep the repository small)
+out/
+data/*
+!data/README.md
+*.sigmf-data
+*.sigmf-meta
+*.i8
+*.sc16
+
+# Claude Code local overrides
+.claude/settings.local.json
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
