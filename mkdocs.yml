@@ -59,6 +59,7 @@ nav:
   - Results:
       - results/index.md
       - False-alarm rate: results/false-alarm.md
+      - Detection probability: results/pd-curves.md
   - Project:
       - Milestones: project/milestones.md
       - Decision log: project/decisions.md
