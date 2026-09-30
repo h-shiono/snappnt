@@ -9,12 +9,14 @@ costs.
 
 | Workflow | Role | Instructions | Started by |
 |---|---|---|---|
-| `.github/workflows/agent-worker.yml` | Worker | `.github/agents/worker.md` | `status:ready` or `status:plan-approved` label added; a comment tagged `**[orchestrator]**`; an untagged maintainer comment on a pull request; a Greptile review; hourly at minute 40; manual |
-| `.github/workflows/agent-orchestrator.yml` | Orchestrator | `.github/agents/orchestrator.md` | A comment tagged `**[worker]**`; an untagged maintainer comment; a Greptile review; the `ci` workflow finishing on a pull request; hourly at minute 10; manual |
+| `.github/workflows/agent-worker.yml` | Worker | `.github/agents/worker.md` | `status:ready` or `status:plan-approved` label added; a comment or review-thread reply tagged `**[orchestrator]**`; an untagged comment or review-thread reply by the repository owner on a pull request; a Greptile review; hourly at minute 40; manual |
+| `.github/workflows/agent-orchestrator.yml` | Orchestrator | `.github/agents/orchestrator.md` | A comment or review-thread reply tagged `**[worker]**`; an untagged comment by the repository owner; a Greptile review; the `ci` workflow finishing on a pull request; hourly at minute 10; manual |
 
-Both run `anthropics/claude-code-action@v1` in automation mode (a `prompt` is given, so it does
-not wait for an `@claude` mention). Each run starts from a fresh checkout of `main`, installs
-the project, reads the rulebook and does one step.
+Both run `anthropics/claude-code-action` in automation mode (a `prompt` is given, so it does
+not wait for an `@claude` mention), pinned to a release commit. Each run starts from a fresh
+checkout of `main`, reads the rulebook and does one step. The worker also installs the project
+so it can run the checks; the orchestrator does not, because it never runs pull request code
+and judges test results from CI instead.
 
 The hand-off between the two is event-driven. A typical issue:
 
@@ -22,7 +24,8 @@ The hand-off between the two is event-driven. A typical issue:
 2. The `**[worker]**` comment starts the orchestrator, which approves the plan and adds
    `status:plan-approved` → the worker starts and opens a pull request.
 3. CI finishing and the Greptile review start the orchestrator and the worker; the worker
-   answers findings, the orchestrator checks the merge conditions and merges.
+   answers findings, the orchestrator checks the merge conditions and merges. It merges only
+   when CI and a Greptile review have both completed on the exact head commit.
 4. The merge closes the issue; the next orchestrator run selects the next issue.
 
 The hourly runs catch anything an event missed.
@@ -81,8 +84,14 @@ progress finish; no new run starts. Nothing else needs to change.
 - The agents act with the personal access token's permissions. Keep it limited to this
   repository and give it an expiry date.
 - The workflows only start on comments from the repository owner or tagged agent comments, but
-  the agents read every comment on an issue. Once the repository is public, anyone can comment;
-  treat the rulebook's "untagged comments are from the maintainer" as meaning the repository
-  owner's account only, and revisit these workflows before publication.
+  the agents read every comment on an issue. Both are instructed to treat only untagged
+  comments by the repository owner's account as instructions; comments from any other account
+  are information. Revisit these workflows before publication, when anyone can comment.
+- The orchestrator's checkout keeps no git credentials, it never checks out pull request code,
+  and it merges only branches of this repository named after the issue. Pull request code runs
+  only in CI, which has no write-capable token.
+- `anthropics/claude-code-action`, `actions/checkout` and `actions/setup-python` are pinned to
+  commit hashes, so a moved tag cannot change the code that receives the secrets. Update the
+  hashes deliberately, after reading the release notes.
 - Transmit commands, pushes to `main`, and repository settings commands are denied through
   `--disallowedTools` in the workflows, in addition to the rules in the instructions.

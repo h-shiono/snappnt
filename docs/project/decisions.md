@@ -99,8 +99,11 @@ an earlier one and says so.
   repository variable, `AGENTS_ENABLED`, switches both on and off. This supersedes the worker
   location in D-008 (the maintainer's machine) for everything except hardware work.
 - **Why:** Work continues without the maintainer's computer being on, and each hand-off happens
-  when the triggering event arrives instead of at the next hourly check. The Actions runner has
-  normal package access, so the orchestrator can run the full test suite before merging.
+  when the triggering event arrives instead of at the next hourly check.
+- **Merge evidence:** the orchestrator no longer re-runs the tests itself (as D-008 described).
+  Its session holds a write-capable token, so it never checks out or runs pull request code;
+  it merges only when the token-less `ci` workflow and a Greptile review have both completed on
+  the exact head commit, and only for branches of this repository named after the issue.
 - **Alternatives:** A scheduled job on the maintainer's machine running `claude -p` (depends on
   the machine being awake; hourly hand-offs). A scheduled cloud task (hourly hand-offs; package
   installation was not available in that environment). The Claude GitHub App instead of a
