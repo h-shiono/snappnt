@@ -94,11 +94,14 @@ Both 50 % points agree with the early estimates to within 1 dB.
 4 ms conditions for the same detection probability. Its snapshot is about 0.2 ms long, one
 twentieth of 4 ms, which alone accounts for 10·log10(20) ≈ 13 dB of coherent integration gain.
 
-**The threshold at 80 MSa/s is stricter than configured.** At 80 MSa/s the measured false-alarm
-rate was about a quarter of the configured `pfa` ([False-alarm rate](false-alarm.md)). The
-threshold is therefore higher than a threshold set for the true `pfa` would be, and the
-ESP32-C3 curve sits slightly to the right of where such a threshold would put it. This page
-does not correct for that.
+**The threshold at 80 MSa/s is probably stricter than configured.** The false-alarm
+measurement ([False-alarm rate](false-alarm.md)) was made at `pfa` = 0.1 and 0.01, not at the
+`pfa` = 1e-3 used here. At 80 MSa/s it found about 0.23 times the configured rate at
+`pfa` = 0.1 and 0.1 to 0.2 times at `pfa` = 0.01. Assuming, without measurement, that the
+threshold is similarly strict at `pfa` = 1e-3, the ESP32-C3 curve sits slightly to the right of
+where a threshold set for the true `pfa` would put it. How large the ratio is at 1e-3 is not
+known. TODO: measure the false-alarm rate at `pfa` = 1e-3 (about 10 000 noise-only trials per
+condition) to settle this. This page does not correct for the effect.
 
 **One coherent block versus four blocks on the ESP32-C61.** With B = 1 the 50 % point is
 0.9 dB lower than with B = 4, as expected from coherent integration over the full 4 ms. At
@@ -119,14 +122,15 @@ checking the frequency error of the wrong detections.
 ## How to regenerate
 
 The four sweeps (about 8, 9, 57 and 15 minutes on one CPU core each; they can run in
-parallel):
+parallel). Every measurement setting is given explicitly, so that a later change of a
+command-line default does not change the result:
 
 ```bash
 pip install -e ".[dev]"
-snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 46:60:1 --trials 200 --freq-span 40000 -o docs/results/pd_navic_s_esp32c3.csv
-snappnt sweep scenarios/navic_s_ideal.yaml --cn0 30:46:1 --trials 200 --freq-span 2000 -o docs/results/pd_navic_s_ideal.csv
-snappnt sweep scenarios/navic_s_esp32c61_4msps.yaml --cn0 30:46:1 --trials 200 --freq-span 40000 --blocks 1 -o docs/results/pd_navic_s_esp32c61_4msps_b1.csv
-snappnt sweep scenarios/navic_s_esp32c61_4msps.yaml --cn0 30:46:1 --trials 200 --freq-span 40000 --blocks 4 -o docs/results/pd_navic_s_esp32c61_4msps_b4.csv
+snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 46:60:1 --trials 200 --freq-span 40000 --blocks 1 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_esp32c3.csv
+snappnt sweep scenarios/navic_s_ideal.yaml --cn0 30:46:1 --trials 200 --freq-span 2000 --blocks 1 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_ideal.csv
+snappnt sweep scenarios/navic_s_esp32c61_4msps.yaml --cn0 30:46:1 --trials 200 --freq-span 40000 --blocks 1 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_esp32c61_4msps_b1.csv
+snappnt sweep scenarios/navic_s_esp32c61_4msps.yaml --cn0 30:46:1 --trials 200 --freq-span 40000 --blocks 4 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_esp32c61_4msps_b4.csv
 ```
 
 The plot and the table of 50 % and 90 % points:
