@@ -102,8 +102,9 @@ For issues without `auto`, the orchestrator posts the same approval comment and 
 
 ## Escalation
 
-The orchestrator sets `status:blocked` and posts a comment that starts with
-**"Maintainer needed:"** and says what exactly needs deciding and what the options are, when:
+The orchestrator sets `status:blocked` and posts a comment that starts with the author tag
+`**[orchestrator]**` on its own line, followed by **"Maintainer needed:"**, what exactly needs
+deciding, and what the options are, when:
 
 - The worker reports that it hit a stop condition from the issue.
 - A plan fails the approval rules and cannot be fixed by a simple request.
@@ -116,19 +117,56 @@ The orchestrator sets `status:blocked` and posts a comment that starts with
 
 ## Comment templates
 
+### Author tag
+
+Agents post through the maintainer's GitHub account, so every comment, review reply and pull
+request description written by an agent starts with a tag on its own line that says which role
+wrote it:
+
+- `**[orchestrator]**` for the orchestrator
+- `**[worker]**` for the worker
+
+Text without a tag is from the maintainer. Commit messages do not carry the tag; the pull
+request that contains them does.
+
 ### Plan approval
 
 ```markdown
-**Plan approved** by the orchestrator.
+**[orchestrator]**
+
+**Plan approved.**
 
 - Scope: <files> — within the issue's allowed scope.
 - Acceptance criteria: <criterion> → <how it will be checked>; ...
 - Watch during implementation: <anything that could go wrong, or "nothing specific">.
 ```
 
+### Next issue selected
+
+```markdown
+**[orchestrator]**
+
+Selected as the next issue. Worker: read CLAUDE.md and docs/development/orchestration.md,
+then post a plan here.
+```
+
+### Escalation
+
+```markdown
+**[orchestrator]**
+
+**Maintainer needed:** <what needs deciding>
+
+- Option A: <...>
+- Option B: <...>
+- Why this is escalated: <which escalation rule applies>
+```
+
 ### Merge
 
 ```markdown
+**[orchestrator]**
+
 **Merging.** Checks run on <commit sha>:
 
 - ruff check / ruff format --check / pytest -q / mkdocs build --strict: pass
