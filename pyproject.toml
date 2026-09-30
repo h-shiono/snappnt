@@ -10,7 +10,7 @@ readme = "README.md"
 license = "BSD-2-Clause"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-authors = [{ name = "TODO: author name" }]
+authors = [{ name = "h-shiono" }]
 keywords = ["GNSS", "PNT", "NavIC", "LEO-PNT", "SDR", "ESP32", "snapshot receiver"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
