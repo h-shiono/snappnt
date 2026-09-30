@@ -180,29 +180,30 @@ then post a plan here.
 These comments are the record of why each change was accepted. Keep them specific enough that
 someone reading only the comment can follow the reasoning.
 
-## Running the worker
+## Running the agents
 
-The worker runs on the maintainer's machine with Claude Code, in a clone of this repository,
-using the maintainer's git identity. A typical start:
+Both agents normally run as GitHub Actions workflows; see [Automation on GitHub Actions](automation.md)
+for how they are started, switched off, and what they cost. Their per-run instructions are in
+`.github/agents/worker.md` and `.github/agents/orchestrator.md`.
+
+Each run starts a fresh session, reads this page, `CLAUDE.md` and the
+[Public-safety rules](public-safety.md), does one step, and stops. The orchestrator does not
+write code for the worker; small review fixes are also left to the worker, so that one session
+does not both change code and approve it.
+
+Commits by the worker are signed off (`git commit -s`) because they are made on the
+maintainer's behalf, and the maintainer takes responsibility for them under the Developer
+Certificate of Origin.
+
+### Working by hand
+
+Hardware steps (`needs-hardware`) and anything the maintainer wants to do interactively can
+still use a local Claude Code session as the worker. Switch the automation off first
+(`AGENTS_ENABLED` set to `false`) so that two workers do not act on the same issue, then start
+the session with:
 
 ```text
 Read CLAUDE.md and docs/development/orchestration.md.
-Work on the issue labelled status:ready (or status:plan-approved) following those rules.
+You are the worker. Work on the issue labelled status:ready, status:plan-approved or
+status:in-review, following those rules.
 ```
-
-Commits by the worker are signed off (`git commit -s`) because they are made under the
-maintainer's identity, who takes responsibility for them under the Developer Certificate of
-Origin.
-
-## Running the orchestrator
-
-The orchestrator is a scheduled task that starts a fresh Claude session every one to two hours.
-Each run:
-
-1. Reads this page, `CLAUDE.md` and [Public-safety rules](public-safety.md).
-2. Lists open issues and pull requests with their `status:` labels, CI state and review
-   threads.
-3. Moves each item one step according to the rules above, or escalates it.
-4. Selects the next issue if nothing is in progress.
-5. Stops. It does not write code for the worker; small review fixes are also left to the
-   worker, so that one session does not both change code and approve it.

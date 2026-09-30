@@ -65,4 +65,5 @@ nav:
   - Development:
       - Contributing and workflow: development/workflow.md
       - Agent orchestration: development/orchestration.md
+      - Automation on GitHub Actions: development/automation.md
       - Public-safety rules: development/public-safety.md

@@ -51,6 +51,7 @@ Before finishing any change, all of these must pass: `ruff check .`, `ruff forma
 | `scenarios/` | Scenario YAML files |
 | `docs/` | MkDocs site: design, guides, results, project records, development rules |
 | `tools/` | Helper scripts (public-safety check, benchmarks, plotting) |
+| `.github/agents/` | Per-run instructions for the worker and orchestrator workflows (docs/development/automation.md) |
 
 ## Conventions
 

@@ -1,0 +1,71 @@
+# Orchestrator agent: approves plans, reviews and merges `auto` pull requests
+# (see docs/development/automation.md and docs/development/orchestration.md).
+#
+# Disabled unless the repository variable AGENTS_ENABLED is "true" (kill switch).
+# Secrets: CLAUDE_CODE_OAUTH_TOKEN and AGENT_GH_TOKEN, as described in agent-worker.yml.
+name: agent-orchestrator
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+  schedule:
+    - cron: "10 * * * *" # hourly fallback
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-orchestrator
+  cancel-in-progress: false
+
+jobs:
+  orchestrator:
+    if: >-
+      vars.AGENTS_ENABLED == 'true' && (
+        github.event_name == 'schedule' ||
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'issue_comment' &&
+          startsWith(github.event.comment.body, '**[worker]**')) ||
+        (github.event_name == 'issue_comment' &&
+          github.event.comment.user.login == github.repository_owner &&
+          !startsWith(github.event.comment.body, '**[')) ||
+        (github.event_name == 'pull_request_review' &&
+          github.event.review.user.login == 'greptile-apps[bot]') ||
+        (github.event_name == 'workflow_run' &&
+          github.event.workflow_run.event == 'pull_request')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_GH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.AGENT_GH_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: python -m pip install -e ".[dev,docs]"
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.AGENT_GH_TOKEN }}
+          allowed_bots: "greptile-apps[bot]"
+          prompt: |
+            Read .github/agents/orchestrator.md and follow it.
+            This run was triggered by: ${{ github.event_name }}
+            Issue or pull request number from the event (may be empty): ${{ github.event.issue.number || github.event.pull_request.number }}
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Bash,Read,Glob,Grep,TodoWrite"
+            --disallowedTools "Write,Edit,Bash(hackrf_transfer:*),Bash(tx_samples_from_file:*),Bash(uhd_siggen:*),Bash(git push:*),Bash(git commit:*),Bash(gh issue close:*),Bash(gh repo:*),Bash(gh secret:*),Bash(gh variable:*)"
