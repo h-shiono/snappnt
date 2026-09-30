@@ -26,9 +26,28 @@ The hand-off between the two is event-driven. A typical issue:
 3. CI finishing and the Greptile review start the orchestrator and the worker; the worker
    answers findings, the orchestrator checks the merge conditions and merges. It merges only
    when CI and a Greptile review have both completed on the exact head commit.
-4. The merge closes the issue; the next orchestrator run selects the next issue.
+4. The merge closes the issue. In the same run the orchestrator confirms the issue is closed,
+   removes its `status:*` label and selects the next issue; if GitHub has not closed the issue
+   yet, the next run does this.
 
 The hourly runs catch anything an event missed.
+
+Two details keep the hand-offs moving without the maintainer:
+
+- **Greptile reviews every push.** `.greptile/config.json` sets `autoReview` to
+  `["open", "push"]`, so each fix the worker pushes gets a new review, and the orchestrator can
+  require a review of the exact head commit before merging. If no review of the head commit
+  has appeared two hours after CI finished on it, the orchestrator escalates rather than
+  waiting indefinitely.
+- **Commits carry the maintainer's identity.** The action sets the git author itself
+  (`claude[bot]` by default). The worker workflow passes the repository owner as `bot_name` and
+  `bot_id`, so commits are authored with the owner's GitHub no-reply address and match the
+  `Signed-off-by` line required by the Developer Certificate of Origin.
+
+The token cannot read GitHub's check-runs API, so the orchestrator reads CI results from the
+Actions runs of the `ci` workflow. It reads the Greptile review from the pull request's reviews
+(their `commit_id`) or, when Greptile posts only a summary comment, from the "Last reviewed
+commit" link in that comment.
 
 ## Why a personal access token
 

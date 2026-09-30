@@ -68,14 +68,15 @@ jobs:
           cache: pip
       - name: Install
         run: python -m pip install -e ".[dev,docs]"
-      - name: Git identity
-        run: |
-          git config user.name "snappnt agent"
-          git config user.email "${{ github.repository_owner_id }}+${{ github.repository_owner }}@users.noreply.github.com"
       - uses: anthropics/claude-code-action@12dd8d74c712f5f3669365b2369b558c495b1104 # v1.0.238
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.AGENT_GH_TOKEN }}
+          # The action sets the git author itself (default claude[bot]). Commits are made on the
+          # maintainer's behalf and signed off by them, so author them as the owner's noreply
+          # address: <owner id>+<owner>@users.noreply.github.com.
+          bot_name: ${{ github.repository_owner }}
+          bot_id: ${{ github.repository_owner_id }}
           allowed_bots: "greptile-apps[bot]"
           prompt: |
             Read .github/agents/worker.md and follow it.

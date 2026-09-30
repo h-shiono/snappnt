@@ -87,14 +87,27 @@ The orchestrator merges a pull request when **all** of these hold:
    with `main`. The orchestrator relies on CI for this and never checks out or runs pull request
    code itself: its session holds a write-capable token, and CI runs without one.
 4. Greptile has completed a review of that same head commit, no Greptile finding is left
-   unanswered, and none that the orchestrator judges blocking is left unfixed.
+   unanswered, and none that the orchestrator judges blocking is left unfixed. A review counts
+   as covering the head commit if either a pull request review by `greptile-apps[bot]` has that
+   `commit_id`, or Greptile's summary comment on the pull request ends with "Last reviewed
+   commit" linking to that commit. Greptile reviews every push automatically
+   (`.greptile/config.json`), so a missing review first means waiting. If the `ci` run on the
+   head commit finished more than two hours ago and there is still no Greptile review of that
+   commit, the orchestrator escalates instead of waiting further, so that a review that never
+   arrives does not leave the issue in review unnoticed.
 5. Each acceptance criterion in the issue has been checked, and the approval comment (below)
    says how.
 6. The pull request description lists what is still unverified, and each unverified item that
    needs hardware is tracked in an open issue.
 
 Merge method: squash merge, with the pull request title as the commit title, pinned to the
-head commit that was checked (`gh pr merge --squash --match-head-commit <sha>`).
+head commit that was checked (`gh pr merge --squash --match-head-commit <sha>`). After the
+merge the orchestrator checks that the linked issue is now closed
+(`gh issue view <n> --json state`), removes its `status:*` label, and, in the same run, selects
+the next issue from a freshly fetched list of open issues. If the linked issue is still open
+(GitHub has not yet processed `Closes #N`), the orchestrator keeps its label, does not select a
+next issue in this run, and leaves the hand-off to the next run; otherwise removing the label
+could make the just-merged issue look selectable again.
 
 `auto` issues that also carry `needs-hardware` may be merged when the code is complete and
 tested with stand-ins (for example a fake serial port); the hardware check stays in its own
