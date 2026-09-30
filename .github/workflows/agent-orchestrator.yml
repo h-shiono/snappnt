@@ -66,6 +66,7 @@ jobs:
             Read .github/agents/orchestrator.md and follow it.
             This run was triggered by: ${{ github.event_name }}
             Issue or pull request number from the event (may be empty): ${{ github.event.issue.number || github.event.pull_request.number }}
+            Repository owner (the maintainer's account): ${{ github.repository_owner }}
           claude_args: >-
             --max-turns 40
             --allowedTools "Bash,Read,Glob,Grep,TodoWrite"
