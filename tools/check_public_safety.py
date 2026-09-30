@@ -35,7 +35,7 @@ HOME_PATH = re.compile(
     r"(/Users/[^/\s<>\"'`]+/|/home/(?!runner/|<)[^/\s<>\"'`]+/|[A-Za-z]:\\Users\\[^\\\s<>]+\\)"
 )
 COORD = re.compile(
-    r"\b(lat|lon|lng|latitude|longitude|alt|altitude)(_deg|_m)?\b\s*[:=]\s*-?\d+\.\d{3,}",
+    r"\b(lat|lon|lng|latitude|longitude|alt|altitude)(_deg|_m)?\b[\"']?\s*[:=]\s*-?\d+\.\d{3,}",
     re.IGNORECASE,
 )
 GEOLOCATION = re.compile(r"core:geolocation")

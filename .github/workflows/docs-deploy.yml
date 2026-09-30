@@ -2,6 +2,8 @@
 #
 # Manual only. GitHub Pages sites are public even when the repository is private, so this
 # workflow must not run before the repository is published (docs/project/decisions.md, D-007).
+# The first step enforces this: it fails unless the repository is public. The public-safety
+# check runs before the site is built, so a failing check blocks deployment.
 # When the repository goes public: enable Pages with "GitHub Actions" as the source, then run
 # this workflow by hand. Adding a push trigger is a separate decision at that time.
 name: docs-deploy
@@ -22,11 +24,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Refuse to deploy while the repository is private
+        env:
+          REPO_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ "$REPO_PRIVATE" != "false" ]; then
+            echo "The repository is private (or visibility is unknown). GitHub Pages sites are public, so deployment is refused."
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: python -m pip install -e ".[docs]"
+      - name: Public-safety check
+        run: python tools/check_public_safety.py
       - run: mkdocs build --strict
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -18,6 +18,8 @@ _spec.loader.exec_module(cps)
         r"C:\Users\carol\Documents",
         "lat: 12.3456",
         "longitude = -98.76543",
+        '{"lat": 12.34567, "lon": 98.76543}',
+        "'lat_deg': -12.345",
         '"core:geolocation": {}',
     ],
 )
