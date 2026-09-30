@@ -89,3 +89,23 @@ an earlier one and says so.
   any list of specific private terms is kept outside the repository.
 - **Why:** The repository will be published. A deny list of private terms committed to the
   repository would itself publish those terms.
+
+## D-010 Agents run on GitHub Actions (2026-10-01)
+
+- **Decision:** The worker and the orchestrator run as GitHub Actions workflows
+  (`anthropics/claude-code-action@v1` in automation mode), started by events and hourly as a
+  fallback. They authenticate to Claude with the maintainer's plan (`CLAUDE_CODE_OAUTH_TOKEN`)
+  and to GitHub with a fine-grained personal access token limited to this repository. A
+  repository variable, `AGENTS_ENABLED`, switches both on and off. This supersedes the worker
+  location in D-008 (the maintainer's machine) for everything except hardware work.
+- **Why:** Work continues without the maintainer's computer being on, and each hand-off happens
+  when the triggering event arrives instead of at the next hourly check.
+- **Merge evidence:** the orchestrator no longer re-runs the tests itself (as D-008 described).
+  Its session holds a write-capable token, so it never checks out or runs pull request code;
+  it merges only when the token-less `ci` workflow and a Greptile review have both completed on
+  the exact head commit, and only for branches of this repository named after the issue.
+- **Alternatives:** A scheduled job on the maintainer's machine running `claude -p` (depends on
+  the machine being awake; hourly hand-offs). A scheduled cloud task (hourly hand-offs; package
+  installation was not available in that environment). The Claude GitHub App instead of a
+  personal access token: avoids a personal token, but its broad permission set and bot identity
+  need `allowed_bots` for every hand-off; the token keeps start conditions simple.
