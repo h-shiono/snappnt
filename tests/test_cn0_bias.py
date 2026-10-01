@@ -103,7 +103,16 @@ def cases_for(name: str, n_blocks: int) -> list[Case]:
         out += [Case("sign_change", "one flip inside a block", flip=True, flip_at=0.375)]
     if CONDITIONS[name]["quantization_bits"] is not None:
         out += [Case("quantisation", "10 bit", quantise=True)]
-    out += [Case("all", "0.5 step, 0.5 sample, flip, 10 bit", 0.5, 0.5, True, True)]
+    out += [
+        Case(
+            "all",
+            "0.5 step, 0.5 sample, flip, 10 bit",
+            freq_frac=0.5,
+            code_frac=0.5,
+            flip=True,
+            quantise=True,
+        )
+    ]
     return out
 
 
@@ -272,6 +281,16 @@ def test_baseline_bias_is_negative_and_bounded():
     row = measure("navic_s_ideal", Case("baseline", "none"), 45.0, 6, 1)
     assert row["p_detect"] == 1.0
     assert -6.0 < row["bias_mean_db"] < 0.0
+
+
+@pytest.mark.parametrize("name", list(CONDITIONS))
+def test_all_case_enables_every_cause(name):
+    (case,) = [c for c in cases_for(name, 1) if c.cause == "all"]
+    assert case.freq_frac == 0.5
+    assert case.code_frac == 0.5
+    assert case.flip
+    assert case.flip_at is None  # a code-period edge, as in the sign-change case
+    assert case.quantise
 
 
 def test_results_csv_has_one_row_per_cause_and_condition():
