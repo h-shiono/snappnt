@@ -60,7 +60,12 @@ maintainer's account, which is why every agent comment starts with a role tag.
 Loops are prevented by the workflows' start conditions instead:
 
 - Each agent only starts on the other agent's tag, on the maintainer's untagged comments, on
-  Greptile, on CI, or on the schedule; never on its own comments.
+  Greptile, on CI, or on the schedule; never on its own comments. The worker ignores reviews
+  and review comments on pull requests whose branch is not named `issue-...` (for example a
+  maintainer's change to the workflows), because those have no issue for it to work on.
+- A worker run ends only when its step is finished (pull request opened, plan posted, review
+  items answered) or with a `Progress:` comment. A run that stopped after a partial push would
+  leave no event to start the next run.
 - Each role has its own concurrency group, so at most one worker and one orchestrator run at a
   time. Extra events wait; GitHub keeps only the newest waiting run per group, which is enough
   because every run re-reads the current state.
