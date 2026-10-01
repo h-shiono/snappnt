@@ -33,12 +33,16 @@ Doppler-rate search (parameter accepted, applied as a fixed hypothesis).
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import numpy as np
+from scipy import fft as sp_fft
 from scipy import stats
 
 from snappnt.signals import SignalSpec, get_code
+
+_WORKERS = os.cpu_count() or 1
 
 
 @dataclass(frozen=True)
@@ -77,6 +81,52 @@ def parabolic_offset(y_minus: float, y_zero: float, y_plus: float) -> float:
     return float(np.clip(0.5 * (y_minus - y_plus) / denom, -0.5, 0.5))
 
 
+# Frequency bins processed per batch: bounds the working arrays to about
+# _CHUNK_BINS x nfft x 8 bytes each.
+_CHUNK_BINS = 64
+
+
+def _power_grid(
+    x: np.ndarray,
+    fs: float,
+    carriers_hz: np.ndarray,
+    doppler_rate_hzps: float,
+    rep_f: list[np.ndarray],
+    block: int,
+    n_blocks: int,
+    nfft: int,
+    k: int,
+) -> np.ndarray:
+    """Non-coherent power of the correlation for every (carrier frequency, lag) cell.
+
+    The frequency bins are processed in batches with one 2-D FFT call per block. The carrier
+    phase is computed in float64 and reduced to one cycle before it is cast to single
+    precision, so the phase stays accurate for long snapshots.
+    """
+    n = x.size
+    t = np.arange(n) / fs
+    quad_cycles = 0.5 * doppler_rate_hzps * t**2
+    power = np.zeros((carriers_hz.size, k), dtype=np.float32)
+    for lo in range(0, carriers_hz.size, _CHUNK_BINS):
+        sel = carriers_hz[lo : lo + _CHUNK_BINS]
+        cycles = np.outer(sel, t)
+        cycles += quad_cycles
+        cycles -= np.floor(cycles)
+        phase = (cycles * (-2.0 * np.pi)).astype(np.float32)
+        y = np.empty(phase.shape, dtype=np.complex64)
+        y.real = np.cos(phase)
+        y.imag = np.sin(phase)
+        y *= x
+        acc = power[lo : lo + sel.size]
+        for b in range(n_blocks):
+            yb_f = sp_fft.fft(y[:, b * block : (b + 1) * block], nfft, axis=-1, workers=_WORKERS)
+            yb_f = np.conj(yb_f)
+            yb_f *= rep_f[b]
+            corr = sp_fft.ifft(yb_f, axis=-1, workers=_WORKERS)[:, :k]
+            acc += corr.real**2 + corr.imag**2
+    return power
+
+
 def acquire(
     x: np.ndarray,
     fs: float,
@@ -112,17 +162,14 @@ def acquire(
     rep = _replica(code, spec.chip_rate_hz, fs, n + k)
     # Each block only needs the replica segment it can overlap: [start, start + block + k).
     nfft = 1 << int(np.ceil(np.log2(2 * block + k)))
-    rep_f = [np.fft.fft(rep[b * block : b * block + block + k], nfft) for b in range(n_blocks)]
+    rep_f = [
+        sp_fft.fft(rep[b * block : b * block + block + k], nfft).astype(np.complex64)
+        for b in range(n_blocks)
+    ]
 
-    t = np.arange(n) / fs
-    power = np.zeros((freqs.size, k), dtype=np.float64)
-    for i, f in enumerate(freqs):
-        wipe = np.exp(-2j * np.pi * ((center_offset_hz + f) * t + 0.5 * doppler_rate_hzps * t**2))
-        y = (x * wipe).astype(np.complex64)
-        for b in range(n_blocks):
-            yb_f = np.fft.fft(y[b * block : (b + 1) * block], nfft)
-            corr = np.fft.ifft(rep_f[b] * np.conj(yb_f))[:k]
-            power[i] += np.abs(corr) ** 2
+    power = _power_grid(
+        x, fs, freqs + center_offset_hz, doppler_rate_hzps, rep_f, block, n_blocks, nfft, k
+    )
 
     # Noise level: mean power away from the peak (exclude +/-1 chip and +/-1 frequency bin).
     fi, ki = np.unravel_index(np.argmax(power), power.shape)
