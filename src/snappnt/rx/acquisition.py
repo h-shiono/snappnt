@@ -81,9 +81,11 @@ def parabolic_offset(y_minus: float, y_zero: float, y_plus: float) -> float:
     return float(np.clip(0.5 * (y_minus - y_plus) / denom, -0.5, 0.5))
 
 
-# Frequency bins processed per batch: bounds the working arrays to about
-# _CHUNK_BINS x nfft x 8 bytes each.
-_CHUNK_BINS = 64
+# Working-memory budget for one batch, in bytes per temporary array. The number of frequency
+# bins per batch is chosen so that each temporary array (float64 cycles, complex64 wipe-off,
+# the FFT buffers) holds about this many bytes, whatever the snapshot length.
+_BATCH_BYTES = 32 * 2**20
+_MAX_CHUNK_BINS = 64
 
 
 def _power_grid(
@@ -100,26 +102,32 @@ def _power_grid(
     """Non-coherent power of the correlation for every (carrier frequency, lag) cell.
 
     The frequency bins are processed in batches with one 2-D FFT call per block. The carrier
-    phase is computed in float64 and reduced to one cycle before it is cast to single
-    precision, so the phase stays accurate for long snapshots.
+    wipe-off is built one block at a time, and the batch size is chosen from the FFT length, so
+    the working memory is about ``_BATCH_BYTES`` per temporary array and does not grow with the
+    snapshot length. The carrier phase is computed in float64 and reduced to one cycle before
+    it is cast to single precision, so the phase stays accurate for long snapshots.
     """
-    n = x.size
-    t = np.arange(n) / fs
+    t = np.arange(n_blocks * block) / fs
     quad_cycles = 0.5 * doppler_rate_hzps * t**2
     power = np.zeros((carriers_hz.size, k), dtype=np.float32)
-    for lo in range(0, carriers_hz.size, _CHUNK_BINS):
-        sel = carriers_hz[lo : lo + _CHUNK_BINS]
-        cycles = np.outer(sel, t)
-        cycles += quad_cycles
-        cycles -= np.floor(cycles)
-        phase = (cycles * (-2.0 * np.pi)).astype(np.float32)
-        y = np.empty(phase.shape, dtype=np.complex64)
-        y.real = np.cos(phase)
-        y.imag = np.sin(phase)
-        y *= x
+    chunk_bins = int(np.clip(_BATCH_BYTES // (8 * max(nfft, block)), 1, _MAX_CHUNK_BINS))
+    for lo in range(0, carriers_hz.size, chunk_bins):
+        sel = carriers_hz[lo : lo + chunk_bins]
         acc = power[lo : lo + sel.size]
         for b in range(n_blocks):
-            yb_f = sp_fft.fft(y[:, b * block : (b + 1) * block], nfft, axis=-1, workers=_WORKERS)
+            seg = slice(b * block, (b + 1) * block)
+            cycles = np.outer(sel, t[seg])
+            cycles += quad_cycles[seg]
+            cycles -= np.floor(cycles)
+            phase = (cycles * (-2.0 * np.pi)).astype(np.float32)
+            del cycles
+            yb = np.empty(phase.shape, dtype=np.complex64)
+            yb.real = np.cos(phase)
+            yb.imag = np.sin(phase)
+            del phase
+            yb *= x[seg]
+            yb_f = sp_fft.fft(yb, nfft, axis=-1, workers=_WORKERS)
+            del yb
             yb_f = np.conj(yb_f)
             yb_f *= rep_f[b]
             corr = sp_fft.ifft(yb_f, axis=-1, workers=_WORKERS)[:, :k]

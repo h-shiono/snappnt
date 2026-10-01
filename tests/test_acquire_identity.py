@@ -70,3 +70,45 @@ def test_doppler_rate_matches_reference():
         ref.freq_offset_hz,
     )
     assert new.metric == pytest.approx(ref.metric, rel=1e-4)
+
+
+@pytest.mark.parametrize("cn0_dbhz", [42.1, 42.2, 42.3, 42.4])
+def test_near_threshold_matches_reference(cn0_dbhz):
+    """With the metric within 10 % of the threshold, single precision must not change the result."""
+    x, scn, spec, prn = _snapshot("navic_s_esp32c61_4msps.yaml", cn0_dbhz, seed=7)
+    kw = dict(
+        center_offset_hz=scn.receiver.baseband_offset_hz,
+        freq_range_hz=(-20e3, 20e3),
+        n_blocks=4,
+    )
+    fs = scn.receiver.sample_rate_hz
+    new = acquire(x, fs, spec, prn, **kw)
+    ref = acquire_reference(x, fs, spec, prn, **kw)
+    assert 0.9 < ref.metric / ref.threshold < 1.1  # the case is really near the threshold
+    assert new.detected == ref.detected
+    assert new.metric == pytest.approx(ref.metric, rel=1e-4)
+    assert new.code_phase_chips == ref.code_phase_chips
+    assert new.freq_offset_hz == ref.freq_offset_hz
+
+
+def test_working_memory_independent_of_snapshot_length():
+    """Peak memory of the power grid stays near the batch budget for a long recording."""
+    import tracemalloc
+
+    from snappnt.rx import acquisition
+
+    fs = 4e6
+    n_blocks, block = 2, 400_000  # 0.2 s in total, 800k samples
+    n = n_blocks * block
+    rng = np.random.default_rng(1)
+    x = (rng.standard_normal(n) + 1j * rng.standard_normal(n)).astype(np.complex64)
+    k = 4000
+    nfft = 1 << int(np.ceil(np.log2(2 * block + k)))
+    rep_f = [np.zeros(nfft, dtype=np.complex64)] * n_blocks
+    carriers = np.arange(200) * 5.0
+    tracemalloc.start()
+    acquisition._power_grid(x, fs, carriers, 0.0, rep_f, block, n_blocks, nfft, k)
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    # Before bounding, 64 bins x 800k samples x 8 bytes = 410 MB per temporary array.
+    assert peak < 12 * acquisition._BATCH_BYTES
