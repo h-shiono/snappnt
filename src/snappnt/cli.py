@@ -74,11 +74,16 @@ def cmd_sim(a: argparse.Namespace) -> int:
     x, truth = generate(scn)
     spec = load_signal(scn.signal)
     out = Path(a.output or f"out/{scn.name}")
+    center_hz = (
+        scn.frequency_plan.tuned_hz
+        if scn.frequency_plan is not None
+        else spec.carrier_hz - scn.receiver.baseband_offset_hz
+    )
     base = write_sigmf(
         out,
         x,
         scn.receiver.sample_rate_hz,
-        center_frequency_hz=spec.carrier_hz - scn.receiver.baseband_offset_hz,
+        center_frequency_hz=center_hz,
         description=f"snappnt simulation: {scn.name}",
         truth=truth,
     )

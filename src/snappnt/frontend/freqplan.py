@@ -25,6 +25,8 @@ class FrequencyPlan:
     lo_side: Literal["low", "high"] = "low"
 
     def __post_init__(self) -> None:
+        if self.lo_side not in ("low", "high"):
+            raise ValueError(f"lo_side must be 'low' or 'high', got {self.lo_side!r}")
         if self.lo_hz is None:
             return
         if self.lo_side == "low" and not self.lo_hz < self.rf_hz:

@@ -1,0 +1,14 @@
+# C-band placeholder signal through an external mixer, low-side LO: IF = 5020 - 2536 = 2484 MHz.
+# The receiver is tuned to the IF, so the carrier sits at 0 Hz before Doppler and clock errors.
+name: cband_bpsk_generic_lowside
+signal: cband_bpsk_generic
+seed: 3
+frequency_plan: {lo_hz: 2536000000, lo_side: low, tuned_hz: 2484000000}
+receiver:
+  sample_rate_hz: 8184000
+  n_samples: 32736          # 4 ms
+  clock_offset_ppm: 0
+  lo_offset_ppm: 0
+  quantization_bits: null
+satellites:
+  - {prn: 5, cn0_dbhz: 48, doppler_hz: 20000, code_phase_chips: 500.4}

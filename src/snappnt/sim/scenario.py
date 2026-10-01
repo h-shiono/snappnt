@@ -19,11 +19,19 @@ Scenarios are YAML files (see ``scenarios/``). Example::
       decimation: {factor: 20, method: none}   # none = keep every n-th sample, ideal = filter first
     satellites:
       - {prn: 1, cn0_dbhz: 55, doppler_hz: 0, code_phase_chips: 123.4}
+
+An external mixer is described by an optional top-level ``frequency_plan``. The RF frequency
+is the signal's ``carrier_hz``. With a plan, ``baseband_offset_hz`` comes from the plan (do not
+set it in ``receiver``), and ``receiver.lo_offset_ppm`` is the error of the external LO::
+
+    frequency_plan: {lo_hz: 2536000000, lo_side: low, tuned_hz: 2484000000}
+    receiver:
+      lo_offset_ppm: 1.5       # external LO error, separate from clock_offset_ppm
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +39,8 @@ import numpy as np
 import yaml
 
 from snappnt.frontend.device import load_device
+from snappnt.frontend.freqplan import FrequencyPlan
+from snappnt.signals import load_signal
 
 
 @dataclass(frozen=True)
@@ -49,6 +59,7 @@ class ReceiverConfig:
     n_samples: int
     baseband_offset_hz: float = 0.0
     clock_offset_ppm: float = 0.0
+    lo_offset_ppm: float = 0.0  # external LO error; only valid with a frequency plan
     quantization_bits: int | None = None
     agc_backoff_db: float = 12.0
     device: str | None = None
@@ -68,6 +79,7 @@ class Scenario:
     receiver: ReceiverConfig
     satellites: tuple[SatelliteTruth, ...]
     seed: int = 0
+    frequency_plan: FrequencyPlan | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -130,6 +142,7 @@ def _receiver_from_dict(d: dict[str, Any]) -> ReceiverConfig:
         n_samples=int(d["n_samples"]),
         baseband_offset_hz=float(d.get("baseband_offset_hz", 0.0)),
         clock_offset_ppm=float(d.get("clock_offset_ppm", 0.0)),
+        lo_offset_ppm=float(d.get("lo_offset_ppm", 0.0)),
         quantization_bits=None
         if d.get("quantization_bits") is None
         else int(d["quantization_bits"]),
@@ -143,15 +156,34 @@ def _receiver_from_dict(d: dict[str, Any]) -> ReceiverConfig:
 
 
 def scenario_from_dict(d: dict[str, Any]) -> Scenario:
-    known = {"name", "signal", "receiver", "satellites", "seed"}
+    known = {"name", "signal", "receiver", "satellites", "seed", "frequency_plan"}
     sats = tuple(
         SatelliteTruth(**{k: (int(v) if k == "prn" else float(v)) for k, v in s.items()})
         for s in d.get("satellites", [])
     )
+    receiver = _receiver_from_dict(d["receiver"])
+    plan = None
+    plan_dict = d.get("frequency_plan")
+    if plan_dict is not None:
+        if "baseband_offset_hz" in d["receiver"]:
+            raise ValueError(
+                "receiver.baseband_offset_hz cannot be combined with frequency_plan; "
+                "it is computed from the plan"
+            )
+        plan = FrequencyPlan(
+            rf_hz=load_signal(d["signal"]).carrier_hz,
+            tuned_hz=float(plan_dict["tuned_hz"]),
+            lo_hz=float(plan_dict["lo_hz"]),
+            lo_side=str(plan_dict.get("lo_side", "low")),
+        )
+        receiver = replace(receiver, baseband_offset_hz=plan.baseband_offset_hz)
+    elif receiver.lo_offset_ppm != 0.0:
+        raise ValueError("receiver.lo_offset_ppm needs a frequency_plan")
     return Scenario(
         name=d["name"],
         signal=d["signal"],
-        receiver=_receiver_from_dict(d["receiver"]),
+        receiver=receiver,
+        frequency_plan=plan,
         satellites=sats,
         seed=int(d.get("seed", 0)),
         extra={k: v for k, v in d.items() if k not in known},
