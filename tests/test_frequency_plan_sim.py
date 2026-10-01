@@ -138,3 +138,26 @@ def test_existing_scenarios_have_no_plan(path):
     spec = load_signal(scn.signal)
     expected = 500.0 - scn.receiver.clock_offset_ppm * 1e-6 * spec.carrier_hz
     assert expected_frequency_offset_hz(scn, 500.0, spec.carrier_hz) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("path, sign", [(LOW, 1), (HIGH, -1)], ids=["low-side", "high-side"])
+def test_carrier_doppler_rate_follows_mixer_sign(path, sign):
+    scn = load_scenario(path)
+    scn = replace(scn, satellites=(replace(scn.satellites[0], doppler_rate_hzps=500.0),))
+    _, truth = generate(scn)
+    sat = truth["satellites"][0]
+    # The truth keeps the RF value; the carrier in the samples uses the mixed value.
+    assert sat["doppler_rate_hzps"] == 500.0
+    assert sat["expected_doppler_rate_hzps"] == sign * 500.0
+
+
+@pytest.mark.parametrize("side", ["High", "LOW", "", "above"])
+def test_invalid_lo_side_is_rejected(side):
+    d = {
+        "name": "x",
+        "signal": load_scenario(LOW).signal,
+        "receiver": {"sample_rate_hz": 5e6, "n_samples": 1000},
+        "frequency_plan": {"lo_hz": 2536e6, "lo_side": side, "tuned_hz": TUNED_HZ},
+    }
+    with pytest.raises(ValueError, match="lo_side"):
+        scenario_from_dict(d)

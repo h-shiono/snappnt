@@ -11,8 +11,9 @@ With a frequency plan (external mixer) the carrier offset at baseband is
 ``doppler_sign * doppler_hz - clock_offset_ppm * tuned_hz - doppler_sign * lo_offset_ppm * lo_hz``
 (ppm as 1e-6): the receiver crystal error acts on the tuned frequency, the external LO error
 moves the IF in the opposite direction of the LO shift for a low-side LO and in the same
-direction for a high-side LO. Code Doppler keeps the RF sign; the mixer does not change the
-code rate.
+direction for a high-side LO. The carrier Doppler rate is mirrored like the Doppler
+(``doppler_sign * doppler_rate_hzps``). Code Doppler and its rate keep the RF sign; the mixer
+does not change the code rate.
 
 Optional band limiting and decimation: when the receiver sets ``generate_rate_hz``, signal and
 noise are created at that rate (noise density still 1 / generate rate), low-pass filtered to
@@ -71,6 +72,7 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
 
     x = (rng.standard_normal(n_gen) + 1j * rng.standard_normal(n_gen)) / np.sqrt(2.0)
 
+    rate_sign = 1 if scn.frequency_plan is None else scn.frequency_plan.doppler_sign
     truth_sats = []
     for sat in scn.satellites:
         code = get_code(spec, sat.prn)
@@ -93,7 +95,8 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
         f_hz = rx.baseband_offset_hz + expected_frequency_offset_hz(
             scn, sat.doppler_hz, spec.carrier_hz
         )
-        phase = 2 * np.pi * (f_hz * t + 0.5 * sat.doppler_rate_hzps * t**2) + sat.carrier_phase_rad
+        rate_hzps = rate_sign * sat.doppler_rate_hzps
+        phase = 2 * np.pi * (f_hz * t + 0.5 * rate_hzps * t**2) + sat.carrier_phase_rad
         x += amp * chips * np.exp(1j * phase)
 
         truth_sats.append(
@@ -102,6 +105,7 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
                 "cn0_dbhz": sat.cn0_dbhz,
                 "doppler_hz": sat.doppler_hz,
                 "doppler_rate_hzps": sat.doppler_rate_hzps,
+                "expected_doppler_rate_hzps": rate_sign * sat.doppler_rate_hzps,
                 "code_phase_chips": sat.code_phase_chips % spec.code_length,
                 "expected_freq_offset_hz": f_hz - rx.baseband_offset_hz,
             }
