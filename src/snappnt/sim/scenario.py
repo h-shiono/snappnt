@@ -20,6 +20,12 @@ Scenarios are YAML files (see ``scenarios/``). Example::
     satellites:
       - {prn: 1, cn0_dbhz: 55, doppler_hz: 0, code_phase_chips: 123.4}
 
+A satellite may give ``pass: {altitude_m, max_elevation_deg, time_s}`` instead of ``doppler_hz``
+and ``doppler_rate_hzps``. These are then computed for a circular-orbit pass at ``time_s``
+seconds from the closest approach (negative before it); see ``snappnt.sim.leo``::
+
+      - {prn: 5, cn0_dbhz: 48, pass: {altitude_m: 550000, max_elevation_deg: 90, time_s: -60}}
+
 An external mixer is described by an optional top-level ``frequency_plan``. The RF frequency
 is the signal's ``carrier_hz``. With a plan, ``baseband_offset_hz`` comes from the plan (do not
 set it in ``receiver``), and ``receiver.lo_offset_ppm`` is the error of the external LO::
@@ -41,6 +47,7 @@ import yaml
 from snappnt.frontend.device import load_device
 from snappnt.frontend.freqplan import FrequencyPlan
 from snappnt.signals import load_signal
+from snappnt.sim.leo import leo_pass_doppler
 
 
 @dataclass(frozen=True)
@@ -155,12 +162,27 @@ def _receiver_from_dict(d: dict[str, Any]) -> ReceiverConfig:
     )
 
 
+def _satellite_from_dict(s: dict[str, Any], signal: str) -> SatelliteTruth:
+    s = dict(s)
+    pass_dict = s.pop("pass", None)
+    if pass_dict is not None:
+        clash = [k for k in ("doppler_hz", "doppler_rate_hzps") if k in s]
+        if clash:
+            raise ValueError(f"satellite 'pass' cannot be combined with {', '.join(clash)}")
+        doppler, rate = leo_pass_doppler(
+            load_signal(signal).carrier_hz,
+            float(pass_dict["altitude_m"]),
+            float(pass_dict["max_elevation_deg"]),
+            float(pass_dict.get("time_s", 0.0)),
+        )
+        s["doppler_hz"] = float(doppler)
+        s["doppler_rate_hzps"] = float(rate)
+    return SatelliteTruth(**{k: (int(v) if k == "prn" else float(v)) for k, v in s.items()})
+
+
 def scenario_from_dict(d: dict[str, Any]) -> Scenario:
     known = {"name", "signal", "receiver", "satellites", "seed", "frequency_plan"}
-    sats = tuple(
-        SatelliteTruth(**{k: (int(v) if k == "prn" else float(v)) for k, v in s.items()})
-        for s in d.get("satellites", [])
-    )
+    sats = tuple(_satellite_from_dict(s, d["signal"]) for s in d.get("satellites", []))
     receiver = _receiver_from_dict(d["receiver"])
     plan = None
     plan_dict = d.get("frequency_plan")
