@@ -11,11 +11,6 @@ Recorded pages:
 | [Detection probability versus C/N0](pd-curves.md) | #2 |
 | [Noise-folding loss at low sample rates](aliasing-loss.md) | #3 |
 | [Bias of the C/N0 estimate](cn0-bias.md) | #4 |
-
-Planned pages:
-
-| Page | Issue |
-|---|---|
-| LEO Doppler rate | #16 |
+| [LEO Doppler rate and the Doppler-rate search](leo-doppler-rate.md) | #16 |
 
 When adding a page, also add it to the `nav` section of `mkdocs.yml`.

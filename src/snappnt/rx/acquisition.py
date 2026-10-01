@@ -27,8 +27,11 @@ three-point parabolic interpolation of the power grid (see ``parabolic_offset``)
 reported ``code_phase_chips`` and ``freq_offset_hz`` change; the detection metric, the
 threshold and the C/N0 estimate are those of the peak cell.
 
-Not yet modelled: code Doppler within the snapshot (negligible for captures of a few ms),
-Doppler-rate search (parameter accepted, applied as a fixed hypothesis).
+Doppler rate: by default one hypothesis, ``doppler_rate_hzps``. With ``rate_range_hzps`` the
+whole grid is computed for each rate hypothesis, and the peak is the maximum over all
+(rate, frequency, lag) cells. The false-alarm threshold counts the rate hypotheses.
+
+Not yet modelled: code Doppler within the snapshot (negligible for captures of a few ms).
 """
 
 from __future__ import annotations
@@ -57,6 +60,8 @@ class AcqResult:
     n_cells: int
     freq_step_hz: float
     coherent_time_s: float
+    doppler_rate_hzps: float = 0.0  # rate hypothesis of the peak cell
+    rate_step_hzps: float = 0.0  # 0 when a single rate hypothesis was used
 
 
 def _replica(code: np.ndarray, chip_rate_hz: float, fs: float, n: int) -> np.ndarray:
@@ -135,6 +140,37 @@ def _power_grid(
     return power
 
 
+def _rate_grid(
+    rate_range_hzps: tuple[float, float],
+    rate_step_hzps: float | None,
+    t_coh: float,
+    n_blocks: int,
+) -> tuple[np.ndarray, float]:
+    """Doppler-rate hypotheses inside ``rate_range_hzps``, both ends included.
+
+    The spacing is at most the requested step (or the default step) and is the same between all
+    neighbours. The default is the smaller of ``1 / (4 T^2)`` for block coherent time ``T`` and
+    ``1 / (2 T t_snap)`` for snapshot length ``t_snap``. The second term matters when
+    ``n_blocks > 1``: a rate error also moves the carrier frequency by up to half of
+    ``error * t_snap`` either side of the middle of the snapshot, while all blocks share one
+    frequency bin; at the edge of a step that stays below a quarter of a bin width.
+    """
+    lo, hi = float(rate_range_hzps[0]), float(rate_range_hzps[1])
+    if not (np.isfinite(lo) and np.isfinite(hi)) or lo > hi:
+        raise ValueError(f"rate_range_hzps must be finite with low <= high, got {rate_range_hzps}")
+    if rate_step_hzps is None:
+        step = min(0.25 / t_coh**2, 0.5 / (t_coh * t_coh * n_blocks))
+    else:
+        step = float(rate_step_hzps)
+        if not np.isfinite(step) or step <= 0.0:
+            raise ValueError(f"rate_step_hzps must be positive and finite, got {rate_step_hzps}")
+    n_steps = int(np.ceil((hi - lo) / step - 1e-9))
+    if n_steps == 0:
+        return np.array([lo]), 0.0
+    rates = np.linspace(lo, hi, n_steps + 1)
+    return rates, float(rates[1] - rates[0])
+
+
 def acquire(
     x: np.ndarray,
     fs: float,
@@ -148,6 +184,8 @@ def acquire(
     n_blocks: int = 1,
     pfa: float = 1e-3,
     refine: bool = False,
+    rate_range_hzps: tuple[float, float] | None = None,
+    rate_step_hzps: float | None = None,
 ) -> AcqResult:
     """Search one PRN.
 
@@ -157,6 +195,13 @@ def acquire(
     ``refine`` interpolates the peak between grid points along code phase and frequency. It
     changes only ``code_phase_chips`` and ``freq_offset_hz``. No frequency refinement is made
     when the peak is on the edge of the searched range.
+
+    ``rate_range_hzps`` (absolute Doppler rates, Hz/s) switches on a Doppler-rate search;
+    ``doppler_rate_hzps`` is then ignored. The step defaults to ``1 / (4 T^2)`` for coherent
+    time ``T``, which keeps the residual quadratic phase at the edge of a step below 1/16 cycle;
+    with ``n_blocks > 1`` it is reduced as described in ``_rate_grid``. Hypotheses stay within
+    the range, both ends included. A reversed range or a step that is not positive raises
+    ``ValueError``.
     """
     x = np.asarray(x, dtype=np.complex64)
     n = x.size
@@ -175,9 +220,22 @@ def acquire(
         for b in range(n_blocks)
     ]
 
-    power = _power_grid(
-        x, fs, freqs + center_offset_hz, doppler_rate_hzps, rep_f, block, n_blocks, nfft, k
-    )
+    if rate_range_hzps is None:
+        rates = np.array([doppler_rate_hzps])
+        used_rate_step = 0.0
+    else:
+        rates, used_rate_step = _rate_grid(rate_range_hzps, rate_step_hzps, t_coh, n_blocks)
+
+    # Keep the grid of the rate hypothesis with the highest peak; the noise level and the
+    # refinement use that grid.
+    power = None
+    best_rate = float(rates[0])
+    for rate in rates:
+        grid = _power_grid(
+            x, fs, freqs + center_offset_hz, float(rate), rep_f, block, n_blocks, nfft, k
+        )
+        if power is None or grid.max() > power.max():
+            power, best_rate = grid, float(rate)
 
     # Noise level: mean power away from the peak (exclude +/-1 chip and +/-1 frequency bin).
     fi, ki = np.unravel_index(np.argmax(power), power.shape)
@@ -190,7 +248,7 @@ def acquire(
     noise = float(np.mean(power[mask])) if mask.any() else float(np.mean(power))
 
     metric = float(power[fi, ki] / noise)
-    n_cells = power.size
+    n_cells = power.size * rates.size
     thr = detection_threshold(n_cells, n_blocks, pfa)
 
     # Post-correlation SNR per block ~ metric - 1, and C/N0 ~ SNR / T_block (losses ignored).
@@ -215,6 +273,8 @@ def acquire(
         n_cells=n_cells,
         freq_step_hz=float(step),
         coherent_time_s=float(t_coh),
+        doppler_rate_hzps=best_rate,
+        rate_step_hzps=float(used_rate_step),
     )
 
 

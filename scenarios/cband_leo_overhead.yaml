@@ -1,0 +1,15 @@
+# C-band placeholder signal on an overhead pass of a 550 km circular orbit, 10 s before the
+# closest approach. Doppler and Doppler rate come from the pass model (snappnt.sim.leo).
+# No external mixer: the receiver is assumed to be tuned to the carrier.
+name: cband_leo_overhead
+signal: cband_bpsk_generic
+seed: 16
+receiver:
+  sample_rate_hz: 4092000
+  n_samples: 163680         # 40 ms
+  quantization_bits: null
+satellites:
+  - prn: 5
+    cn0_dbhz: 50
+    code_phase_chips: 500.4
+    pass: {altitude_m: 550000, max_elevation_deg: 90, time_s: -10}

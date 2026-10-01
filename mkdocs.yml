@@ -64,6 +64,7 @@ nav:
       - Detection probability: results/pd-curves.md
       - Noise-folding loss: results/aliasing-loss.md
       - C/N0 estimate bias: results/cn0-bias.md
+      - LEO Doppler rate: results/leo-doppler-rate.md
   - Project:
       - Milestones: project/milestones.md
       - Decision log: project/decisions.md
