@@ -4,6 +4,7 @@ codes    print code properties (first chips in ICD octal form)
 sim      scenario YAML -> SigMF (+ optional generator playback file)
 acquire  SigMF -> acquisition table (and truth comparison if present)
 sweep    scenario YAML -> detection probability vs C/N0 (CSV)
+capture  ESP-SDR board on a serial port -> SigMF (one file per capture)
 info     list signals and devices
 """
 
@@ -152,6 +153,97 @@ def cmd_sweep(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_capture(a: argparse.Namespace) -> int:
+    from snappnt.io.espsdr_capture import capture_paths, command_plan, save_capture_sigmf, utc_now
+    from snappnt.io.espsdr_client import (
+        EspSdrClient,
+        EspSdrDamagedCapture,
+        EspSdrError,
+        EspSdrTimeout,
+    )
+
+    gain = None if a.gain == "auto" else _parse_gain(a.gain)
+    if gain == -1:
+        print("error: --gain must be 'auto' or a non-negative integer index", file=sys.stderr)
+        return 2
+    try:
+        plan = command_plan(
+            frequency_hz=a.freq_hz,
+            sample_rate_hz=a.rate_sps,
+            n_samples=a.samples,
+            gain=gain,
+            bandwidth_mhz=a.bandwidth_mhz,
+            bits=a.bits,
+            count=a.count,
+        )
+        paths = capture_paths(a.output, a.count)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    if a.dry_run:
+        print("\n".join(plan))
+        return 0
+    if a.port is None:
+        print("error: the serial port is required unless --dry-run is given", file=sys.stderr)
+        return 2
+
+    try:
+        client = EspSdrClient(port=a.port)
+    except (EspSdrError, EspSdrTimeout, OSError) as e:
+        print(f"error: cannot open the board: {e}", file=sys.stderr)
+        return 1
+    done = 0
+    try:
+        info = client.info()
+        client.tune(a.freq_hz)
+        if a.bandwidth_mhz is not None:
+            client.set_bandwidth_mhz(a.bandwidth_mhz)
+        if gain is None:
+            client.set_gain_hardware()
+        else:
+            client.set_gain_manual(gain)
+        client.set_sample_rate(a.rate_sps)
+        for path in paths:
+            when = utc_now()
+            cap = client.capture(a.samples, bits=a.bits)
+            base = save_capture_sigmf(
+                cap,
+                path,
+                firmware_info=info,
+                gain=gain,
+                analog_bandwidth_mhz=a.bandwidth_mhz,
+                host_time_utc=when,
+                description="snappnt capture",
+            )
+            done += 1
+            print(f"wrote {base}.sigmf-meta / .sigmf-data  ({cap.samples.size} samples)")
+    except EspSdrDamagedCapture as e:
+        print(f"error: damaged capture {done + 1} of {a.count}: {e}", file=sys.stderr)
+        try:
+            client.resync(99)
+        except (EspSdrError, EspSdrTimeout):
+            pass
+        return 1
+    except (EspSdrError, EspSdrTimeout, ValueError) as e:
+        print(f"error: capture {done + 1} of {a.count}: {e}", file=sys.stderr)
+        return 1
+    finally:
+        try:
+            client.release()
+        except (EspSdrTimeout, OSError):
+            pass
+        client.close()
+    return 0
+
+
+def _parse_gain(text: str) -> int:
+    try:
+        value = int(text)
+    except ValueError:
+        return -1
+    return value if value >= 0 else -1
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="snappnt", description=__doc__.split("\n")[0])
     sub = p.add_subparsers(dest="command", required=True)
@@ -191,6 +283,19 @@ def build_parser() -> argparse.ArgumentParser:
         s.add_argument("--blocks", type=int, default=1, help="non-coherent blocks")
         s.add_argument("--pfa", type=float, default=1e-3)
         s.set_defaults(func=func)
+
+    s = sub.add_parser("capture", help="capture snapshots from an ESP-SDR board to SigMF")
+    s.add_argument("port", nargs="?", help="serial port (not needed with --dry-run)")
+    s.add_argument("--freq-hz", type=float, default=2492e6, help="whole MHz, 100 to 6000")
+    s.add_argument("--rate-sps", type=float, default=80e6)
+    s.add_argument("-n", "--samples", type=int, default=16380)
+    s.add_argument("--gain", default="auto", help="'auto' (hardware AGC) or a gain index")
+    s.add_argument("--bandwidth-mhz", type=float, help="analog bandwidth (default: unchanged)")
+    s.add_argument("--count", type=int, default=1, help="number of captures, one file each")
+    s.add_argument("-o", "--output", default="out/capture", help="output base path")
+    s.add_argument("--bits", type=int, choices=(8, 10), default=10)
+    s.add_argument("--dry-run", action="store_true", help="print the commands, send nothing")
+    s.set_defaults(func=cmd_capture)
     return p
 
 

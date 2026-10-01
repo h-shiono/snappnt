@@ -109,3 +109,16 @@ an earlier one and says so.
   installation was not available in that environment). The Claude GitHub App instead of a
   personal access token: avoids a personal token, but its broad permission set and bot identity
   need `allowed_bots` for every hand-off; the token keeps start conditions simple.
+
+## D-011 One SigMF recording per ESP-SDR capture (2026-10-01)
+
+- **Decision:** `snappnt capture --count N` writes N separate SigMF recordings,
+  `<output>_0000`, `<output>_0001`, ..., and the plain `<output>` when N is 1. Each recording
+  carries its own host time (`snappnt:host_time_utc`, `core:datetime`) and gain.
+- **Why:** `snappnt acquire` and `read_sigmf` treat a data file as one contiguous snapshot. The
+  firmware takes one burst per capture command, so separate captures are not contiguous in
+  time. Joining them in one file would make acquisition correlate across the gaps and give a
+  wrong code phase and Doppler frequency.
+- **Alternatives:** One file with several SigMF `captures` segments. It is valid SigMF, but
+  `read_sigmf` and `acquire` would have to be changed to treat each segment separately, which
+  is outside this issue.
