@@ -64,7 +64,8 @@ def lines(port: FakePort) -> list[str]:
 def test_dry_run_prints_the_command_sequence(capsys):
     code = run("--dry-run", "--freq-hz", "2492e6", "-n", "256", "--bandwidth-mhz", "40")
     assert code == 0
-    assert capsys.readouterr().out.splitlines() == [
+    captured = capsys.readouterr()
+    assert captured.out.splitlines() == [
         "SYNC 1",
         "INFO",
         "FREQ 2492",
@@ -72,7 +73,9 @@ def test_dry_run_prints_the_command_sequence(capsys):
         "GAIN HARDWARE",
         "LIMITS?",
         "CAP20 256 0",
+        "RELEASE",
     ]
+    assert "not checked without a board" in captured.err
 
 
 @pytest.mark.parametrize(
@@ -84,6 +87,8 @@ def test_dry_run_prints_the_command_sequence(capsys):
         ["--gain", "loud"],
         ["--gain", "-3"],
         ["--count", "0"],
+        ["--bandwidth-mhz", "100"],
+        ["--bandwidth-mhz", "5"],
     ],
 )
 def test_bad_arguments_exit_2_and_write_nothing(args, tmp_path, capsys):
@@ -210,3 +215,43 @@ def test_capture_then_acquire_finds_the_simulated_satellite(fake_port, tmp_path,
     code_len = 1023
     d = abs(code_phase - sat["code_phase_chips"])
     assert min(d, code_len - d) < 1.0
+
+
+def test_existing_output_is_refused_and_left_untouched(fake_port, tmp_path, capsys):
+    out = tmp_path / "cap"
+    (tmp_path / "cap.sigmf-data").write_bytes(b"old")
+    port = fake_port()
+    assert run("PORT", "-n", "256", "-o", str(out)) == 2
+    assert (tmp_path / "cap.sigmf-data").read_bytes() == b"old"
+    assert "--overwrite" in capsys.readouterr().err
+    assert port.written == []
+
+
+def test_count_refuses_when_a_later_file_exists(fake_port, tmp_path):
+    (tmp_path / "r_0001.sigmf-meta").write_text("old")
+    fake_port()
+    assert run("PORT", "-n", "256", "--count", "2", "-o", str(tmp_path / "r")) == 2
+    assert not (tmp_path / "r_0000.sigmf-data").exists()
+
+
+def test_overwrite_replaces_existing_output(fake_port, tmp_path):
+    (tmp_path / "cap.sigmf-data").write_bytes(b"old")
+    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, data_reply(ZERO_BODY, 256), b"OK\n")
+    assert run("PORT", "-n", "256", "--overwrite", "-o", str(tmp_path / "cap")) == 0
+    assert (tmp_path / "cap.sigmf-data").stat().st_size == 256 * 4
+    assert json.loads((tmp_path / "cap.sigmf-meta").read_text())["captures"][0]["core:datetime"]
+
+
+def test_write_error_is_reported_and_leaves_no_partial_files(
+    fake_port, tmp_path, monkeypatch, capsys
+):
+    from snappnt.io import sigmf_io
+
+    def fail(self, *a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(sigmf_io.Path, "write_text", fail)
+    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, data_reply(ZERO_BODY, 256), b"OK\n")
+    assert run("PORT", "-n", "256", "-o", str(tmp_path / "cap")) == 1
+    assert not any(tmp_path.iterdir())
+    assert "cannot write capture 1 of 1: disk full" in capsys.readouterr().err

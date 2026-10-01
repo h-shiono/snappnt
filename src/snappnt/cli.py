@@ -154,7 +154,14 @@ def cmd_sweep(a: argparse.Namespace) -> int:
 
 
 def cmd_capture(a: argparse.Namespace) -> int:
-    from snappnt.io.espsdr_capture import capture_paths, command_plan, save_capture_sigmf, utc_now
+    from snappnt.io.espsdr_capture import (
+        LIVE_ONLY_CHECKS,
+        capture_paths,
+        command_plan,
+        existing_outputs,
+        save_capture_sigmf,
+        utc_now,
+    )
     from snappnt.io.espsdr_client import (
         EspSdrClient,
         EspSdrDamagedCapture,
@@ -182,7 +189,15 @@ def cmd_capture(a: argparse.Namespace) -> int:
         return 2
     if a.dry_run:
         print("\n".join(plan))
+        print(f"note: {LIVE_ONLY_CHECKS}", file=sys.stderr)
         return 0
+    if not a.overwrite and (found := existing_outputs(paths)):
+        print(
+            f"error: {found[0]} exists (and {len(found) - 1} more); "
+            "choose another --output or pass --overwrite",
+            file=sys.stderr,
+        )
+        return 2
     if a.port is None:
         print("error: the serial port is required unless --dry-run is given", file=sys.stderr)
         return 2
@@ -206,15 +221,21 @@ def cmd_capture(a: argparse.Namespace) -> int:
         for path in paths:
             when = utc_now()
             cap = client.capture(a.samples, bits=a.bits)
-            base = save_capture_sigmf(
-                cap,
-                path,
-                firmware_info=info,
-                gain=gain,
-                analog_bandwidth_mhz=a.bandwidth_mhz,
-                host_time_utc=when,
-                description="snappnt capture",
-            )
+            try:
+                base = save_capture_sigmf(
+                    cap,
+                    path,
+                    firmware_info=info,
+                    gain=gain,
+                    analog_bandwidth_mhz=a.bandwidth_mhz,
+                    host_time_utc=when,
+                    description="snappnt capture",
+                )
+            except OSError as e:
+                for f in existing_outputs([path]):
+                    f.unlink(missing_ok=True)
+                print(f"error: cannot write capture {done + 1} of {a.count}: {e}", file=sys.stderr)
+                return 1
             done += 1
             print(f"wrote {base}.sigmf-meta / .sigmf-data  ({cap.samples.size} samples)")
     except EspSdrDamagedCapture as e:
@@ -294,6 +315,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--count", type=int, default=1, help="number of captures, one file each")
     s.add_argument("-o", "--output", default="out/capture", help="output base path")
     s.add_argument("--bits", type=int, choices=(8, 10), default=10)
+    s.add_argument("--overwrite", action="store_true", help="replace existing output files")
     s.add_argument("--dry-run", action="store_true", help="print the commands, send nothing")
     s.set_defaults(func=cmd_capture)
     return p

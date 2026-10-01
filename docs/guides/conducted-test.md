@@ -74,6 +74,13 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
   is `null` in AGC mode.
 - `--bandwidth-mhz` sets the analog bandwidth; without it the board's setting is unchanged.
   `--bits 8` uses the 8-bit transfer, `--bits 10` (default) the packed 10-bit transfer.
+- The command refuses to start if any output file already exists; `--overwrite` replaces them.
+  `--dry-run` prints the full sequence including the final `RELEASE`. It checks the frequency,
+  the sample rate in the ESP-SDR rate table, the bandwidth (0, or 14 to 62 MHz) and the bit
+  depth. The maximum gain index, the rates a particular chip offers and the maximum samples per
+  capture are reported by the board (`LIMITS?`, `INFO`), so only a live run checks them. A file
+  that cannot be written (for example a full disk) ends the run with exit code 1, naming the
+  capture, and removes that capture's partial files.
 - With `--count N` greater than 1 each capture is its own recording, `run1_0000`, `run1_0001`,
   and so on (decision D-011). Captures already written stay if a later one fails; a damaged
   capture (wrong CRC-32) ends the run with exit code 1 after the port is resynchronised.

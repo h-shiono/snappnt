@@ -6,7 +6,6 @@ in docs/design/espsdr-protocol.md and the decoder in ``espsdr_iq``.
 
 from __future__ import annotations
 
-import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +18,10 @@ from snappnt.io.espsdr_client import (
     EspSdrCapture,
 )
 from snappnt.io.sigmf_io import write_sigmf
+
+# From the ``LIMITS`` reply in docs/design/espsdr-protocol.md: "bandwidth":[14,62,1,0].
+BANDWIDTH_MIN_MHZ = 14
+BANDWIDTH_MAX_MHZ = 62
 
 _CHIP = re.compile(r"^(\w+)SDR\b")
 
@@ -76,13 +79,20 @@ def save_capture_sigmf(
         description=description,
         hw=f"ESP-SDR {chip}".strip() if firmware_info is not None else "ESP-SDR",
         extra_global=extra,
+        extra_capture={"core:datetime": stamp} if stamp is not None else None,
     )
-    if stamp is not None:
-        meta_path = base.with_name(base.name + ".sigmf-meta")
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        meta["captures"][0]["core:datetime"] = stamp
-        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return base
+
+
+def existing_outputs(paths: list[Path]) -> list[Path]:
+    """The SigMF files of ``paths`` that already exist."""
+    found = []
+    for p in paths:
+        for suffix in (".sigmf-data", ".sigmf-meta"):
+            f = p.with_name(p.name + suffix)
+            if f.exists():
+                found.append(f)
+    return found
 
 
 def capture_paths(base: str | Path, count: int) -> list[Path]:
@@ -122,6 +132,13 @@ def command_plan(
             f"{sample_rate_hz} sps is not an ESP-SDR rate; "
             f"choose one of {sorted(RATE_INDEX_BY_SPS)}"
         )
+    if bandwidth_mhz is not None and not (
+        bandwidth_mhz == 0 or BANDWIDTH_MIN_MHZ <= bandwidth_mhz <= BANDWIDTH_MAX_MHZ
+    ):
+        raise ValueError(
+            f"bandwidth must be 0 (widest) or {BANDWIDTH_MIN_MHZ} to {BANDWIDTH_MAX_MHZ} MHz, "
+            f"got {bandwidth_mhz}"
+        )
     if bits not in (8, 10):
         raise ValueError(f"bits must be 8 or 10, got {bits}")
     limit = max_samples if max_samples is not None else n_samples
@@ -136,7 +153,15 @@ def command_plan(
     lines.append("LIMITS?")
     index = RATE_INDEX_BY_SPS[int(sample_rate_hz)]
     lines += [f"CAP{bits * 2} {n_samples} {index}"] * count
+    lines.append("RELEASE")
     return lines
+
+
+# Limits that only the board reports (``LIMITS?`` and ``INFO``), so a dry run cannot check them.
+LIVE_ONLY_CHECKS = (
+    "not checked without a board: the maximum gain index, the sample rates the chip offers "
+    "and the maximum samples per capture"
+)
 
 
 def utc_now() -> datetime:

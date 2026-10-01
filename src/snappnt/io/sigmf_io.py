@@ -46,8 +46,13 @@ def write_sigmf(
     hw: str = "",
     truth: dict[str, Any] | None = None,
     extra_global: dict[str, Any] | None = None,
+    extra_capture: dict[str, Any] | None = None,
 ) -> Path:
-    """Write samples + metadata. Returns the base path (without suffix)."""
+    """Write samples + metadata. Returns the base path (without suffix).
+
+    ``extra_capture`` adds keys to the capture segment (for example ``core:datetime``). The
+    metadata file is written to a temporary file and renamed, so an interrupted write never
+    leaves a truncated ``.sigmf-meta`` next to the sample file."""
     base = _base(path)
     base.parent.mkdir(parents=True, exist_ok=True)
     x = np.asarray(samples)
@@ -78,6 +83,8 @@ def write_sigmf(
     capture: dict[str, Any] = {"core:sample_start": 0}
     if center_frequency_hz is not None:
         capture["core:frequency"] = float(center_frequency_hz)
+    if extra_capture:
+        capture.update(extra_capture)
 
     annotations = []
     if truth is not None:
@@ -91,7 +98,10 @@ def write_sigmf(
         )
 
     meta = {"global": global_, "captures": [capture], "annotations": annotations}
-    _with(base, ".sigmf-meta").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    meta_path = _with(base, ".sigmf-meta")
+    tmp_path = meta_path.with_name(meta_path.name + ".tmp")
+    tmp_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    tmp_path.replace(meta_path)
     return base
 
 
