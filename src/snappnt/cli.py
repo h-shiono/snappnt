@@ -5,6 +5,7 @@ sim      scenario YAML -> SigMF (+ optional generator playback file)
 acquire  SigMF -> acquisition table (and truth comparison if present)
 sweep    scenario YAML -> detection probability vs C/N0 (CSV)
 capture  ESP-SDR board on a serial port -> SigMF (one file per capture)
+convert  raw I/Q file of UHD or HackRF -> SigMF
 info     list signals and devices
 """
 
@@ -307,6 +308,27 @@ def cmd_capture(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_convert(a: argparse.Namespace) -> int:
+    from snappnt.io import convert_iq
+
+    try:
+        base = convert_iq(
+            a.input,
+            a.output,
+            a.format,
+            a.rate_sps,
+            a.freq_hz,
+            a.device,
+            description=a.description,
+            overwrite=a.overwrite,
+        )
+    except (ValueError, FileExistsError, OSError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    print(f"wrote {base}.sigmf-meta / .sigmf-data")
+    return 0
+
+
 def _parse_gain(text: str) -> int:
     try:
         value = int(text)
@@ -402,6 +424,23 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--overwrite", action="store_true", help="replace existing output files")
     s.add_argument("--dry-run", action="store_true", help="print the commands, send nothing")
     s.set_defaults(func=cmd_capture)
+
+    s = sub.add_parser("convert", help="convert a raw UHD or HackRF I/Q file to SigMF")
+    s.add_argument("input", help="raw interleaved I/Q file")
+    s.add_argument("-o", "--output", required=True, help="output base path")
+    s.add_argument(
+        "--format",
+        required=True,
+        choices=("uhd-short", "uhd-float", "hackrf"),
+        help="uhd-short: int16 and uhd-float: float32 (both little endian, as written on x86 "
+        "and ARM hosts); hackrf: signed int8",
+    )
+    s.add_argument("--rate-sps", type=float, required=True, help="sample rate of the recording")
+    s.add_argument("--freq-hz", type=float, required=True, help="centre frequency [Hz]")
+    s.add_argument("--device", required=True, help="recording device, stored in core:hw")
+    s.add_argument("--description", default="", help="free text stored in core:description")
+    s.add_argument("--overwrite", action="store_true", help="replace existing output files")
+    s.set_defaults(func=cmd_convert)
     return p
 
 
