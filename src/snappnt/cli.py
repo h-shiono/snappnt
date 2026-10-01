@@ -164,9 +164,20 @@ def _parse_loss(text: str) -> float:
 def cmd_link_budget(a: argparse.Namespace) -> int:
     from snappnt.eval.linkbudget import evaluate_branches
 
+    if a.ref_nf_db is None and a.ref_loss:
+        print("error: --ref-loss needs --ref-nf-db", file=sys.stderr)
+        return 2
     branches = {"ESP32": (a.esp32_loss or [], a.esp32_nf_db)}
     if a.ref_nf_db is not None:
         branches["reference"] = (a.ref_loss or [], a.ref_nf_db)
+    for name, (own, _) in branches.items():
+        if not (a.loss or own):
+            print(
+                f"error: no losses given for the {name} path; pass --loss, or --loss 0 "
+                "if there really is none",
+                file=sys.stderr,
+            )
+            return 2
     try:
         results = evaluate_branches(
             a.gen_dbm, a.loss or [], branches, a.scenario_cn0_dbhz, a.margin_db
@@ -345,7 +356,12 @@ def build_parser() -> argparse.ArgumentParser:
         s.set_defaults(func=func)
 
     s = sub.add_parser("link-budget", help="input level and C/N0 for a conducted test")
-    s.add_argument("--gen-dbm", type=float, required=True, help="generator output [dBm]")
+    s.add_argument(
+        "--gen-dbm",
+        type=float,
+        required=True,
+        help="generator output of the signal alone, without added noise [dBm]",
+    )
     s.add_argument(
         "--loss",
         type=_parse_loss,

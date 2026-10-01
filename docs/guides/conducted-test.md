@@ -36,7 +36,11 @@ B210-class USRP (TX) ─ 30 dB ─ splitter ─┬─ 30 dB ─ DC block ─ XIA
 
 `snappnt link-budget` adds up the losses between the generator and each receiver, and gives the
 input level in dBm. It takes no default for the generator power, the losses or the ESP32 noise
-figure, so each run states them. The splitter's loss on each output is a value you pass: an
+figure, so each run states them; a path with no loss at all is given as `--loss 0`, and the
+command refuses to run when a receiver's path has no loss option.
+`--gen-dbm` is the power of the signal alone. When the playback file also contains
+software-added noise, a power meter at the generator output reads signal plus noise, so that
+reading must not be passed as `--gen-dbm`. The splitter's loss on each output is a value you pass: an
 ideal 2-way split is 3.01 dB, and a real splitter adds some excess loss.
 
 ```bash
@@ -57,7 +61,7 @@ weak-signal test of the section "Next step" below.
   choice made for this tool, not a value from a source (decision D-012). Exit code 1 means the
   check failed.
 - `--esp32-loss` and `--ref-loss` list the losses on each branch after the splitter;
-  `--ref-nf-db` turns on the reference receiver. `--loss` is the part of the path shared by
+  `--ref-nf-db` turns on the reference receiver, and `--ref-loss` without it is an error. `--loss` is the part of the path shared by
   both.
 - The noise density uses 290 K (−174 dBm/Hz plus the noise figure), the usual convention for
   noise figures. Signal power is the power in the received band; quantisation and filter losses

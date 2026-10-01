@@ -4,6 +4,9 @@ All levels are in dBm, losses in dB (positive numbers), noise densities in dBm/H
 dB-Hz. The receiver's noise density is k*T0 + NF with T0 = 290 K, which is -174 dBm/Hz + NF
 (the usual convention for a noise figure). The signal power is taken as the power in the
 received band; implementation losses of the receiver (quantisation, filter loss) are ignored.
+
+The generator power is the power of the signal alone. During playback of a file that also
+contains software-added noise, a power meter reads signal plus noise, which is not this value.
 """
 
 from __future__ import annotations
@@ -18,12 +21,19 @@ REFERENCE_TEMPERATURE_K = 290.0
 DEFAULT_MARGIN_DB = 10.0
 
 
+def _finite(**values: float) -> None:
+    for name, v in values.items():
+        if not math.isfinite(v):
+            raise ValueError(f"{name} must be a finite number, got {v}")
+
+
 def _db_sum(levels_db: Sequence[float]) -> float:
     return 10.0 * math.log10(sum(10.0 ** (x / 10.0) for x in levels_db))
 
 
 def input_level_dbm(generator_dbm: float, losses_db: Sequence[float]) -> float:
-    """Generator output minus the sum of the losses on the path (all losses >= 0 dB)."""
+    """Signal-only generator power minus the losses on the path (all losses >= 0 dB)."""
+    _finite(generator_dbm=generator_dbm, **{f"losses_db[{i}]": x for i, x in enumerate(losses_db)})
     if any(x < 0 for x in losses_db):
         raise ValueError("losses must be zero or positive (in dB)")
     return generator_dbm - sum(losses_db)
@@ -31,6 +41,7 @@ def input_level_dbm(generator_dbm: float, losses_db: Sequence[float]) -> float:
 
 def noise_density_dbm_hz(nf_db: float, temperature_k: float = REFERENCE_TEMPERATURE_K) -> float:
     """Receiver noise density 10*log10(k*T/1 mW per Hz) + NF; -174 dBm/Hz + NF at 290 K."""
+    _finite(nf_db=nf_db, temperature_k=temperature_k)
     if temperature_k <= 0:
         raise ValueError("temperature_k must be positive")
     return 10.0 * math.log10(BOLTZMANN_J_PER_K * temperature_k / 1e-3) + nf_db
@@ -38,6 +49,7 @@ def noise_density_dbm_hz(nf_db: float, temperature_k: float = REFERENCE_TEMPERAT
 
 def cn0_dbhz(p_in_dbm: float, nf_db: float) -> float:
     """C/N0 of a noise-free signal at p_in_dbm, limited by the receiver's own noise."""
+    _finite(p_in_dbm=p_in_dbm)
     return p_in_dbm - noise_density_dbm_hz(nf_db)
 
 
@@ -59,7 +71,13 @@ def check_injected_noise(
     nf_db: float,
     margin_db: float = DEFAULT_MARGIN_DB,
 ) -> NoiseCheck:
-    """Check that noise added in software dominates the receiver's own noise."""
+    """Check that noise added in software dominates the receiver's own noise.
+
+    p_in_dbm is the signal-only power at the receiver input.
+    """
+    _finite(
+        scenario_cn0_dbhz=scenario_cn0_dbhz, p_in_dbm=p_in_dbm, nf_db=nf_db, margin_db=margin_db
+    )
     n_inj = p_in_dbm - scenario_cn0_dbhz
     n_rx = noise_density_dbm_hz(nf_db)
     ratio = n_inj - n_rx

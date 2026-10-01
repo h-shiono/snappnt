@@ -86,6 +86,43 @@ def test_cli(capsys):
     assert cli.main(["link-budget", "--gen-dbm", "0", "--esp32-nf-db", "5", "--loss", "-3"]) == 2
 
 
+def test_non_finite_rejected():
+    for bad in (float("nan"), float("inf")):
+        with pytest.raises(ValueError):
+            input_level_dbm(bad, [3])
+        with pytest.raises(ValueError):
+            input_level_dbm(0, [bad])
+        with pytest.raises(ValueError):
+            noise_density_dbm_hz(bad)
+        with pytest.raises(ValueError):
+            check_injected_noise(bad, -74, 5)
+        with pytest.raises(ValueError):
+            check_injected_noise(50, bad, 5)
+        with pytest.raises(ValueError):
+            check_injected_noise(50, -74, 5, margin_db=bad)
+
+
+def test_cli_rejects_bad_input(capsys):
+    base = ["link-budget", "--esp32-nf-db", "5"]
+    # no loss given at all
+    assert cli.main([*base, "--gen-dbm", "-10"]) == 2
+    assert "no losses" in capsys.readouterr().err
+    # explicit zero is accepted
+    assert cli.main([*base, "--gen-dbm", "-10", "--loss", "0"]) == 0
+    # reference losses without a reference noise figure
+    assert cli.main([*base, "--gen-dbm", "-10", "--loss", "3", "--ref-loss", "30"]) == 2
+    assert "--ref-nf-db" in capsys.readouterr().err
+    # reference receiver with no loss on its path
+    assert cli.main([*base, "--gen-dbm", "-10", "--esp32-loss", "3", "--ref-nf-db", "4"]) == 2
+    assert "reference" in capsys.readouterr().err
+    # non-finite numbers
+    for bad in ("inf", "nan"):
+        assert cli.main([*base, "--gen-dbm", bad, "--loss", "3"]) == 2
+        assert cli.main([*base, "--gen-dbm", "0", "--loss", bad]) == 2
+        assert cli.main([*base, "--gen-dbm", "0", "--loss", "3", "--scenario-cn0-dbhz", bad]) == 2
+    capsys.readouterr()
+
+
 def test_template_linked():
     assert (ROOT / "docs/guides/conducted-test-log-template.md").is_file()
     assert "conducted-test-log-template.md" in (ROOT / "docs/guides/conducted-test.md").read_text()
