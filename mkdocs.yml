@@ -55,6 +55,7 @@ nav:
   - Design:
       - Architecture: design/architecture.md
       - ESP-SDR protocol: design/espsdr-protocol.md
+      - ESP32-C61 capture: design/esp32c61-capture.md
   - Guides:
       - Conducted test: guides/conducted-test.md
       - Conducted test log template: guides/conducted-test-log-template.md
