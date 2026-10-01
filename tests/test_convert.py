@@ -108,3 +108,52 @@ def test_converted_file_is_acquired(tmp_path, capsys, fmt):
     assert rc == 0
     row = [ln for ln in capsys.readouterr().out.splitlines() if ln.split()[:1] == [str(prn)]]
     assert row and row[0].split()[1] == "yes"
+
+
+def test_float_special_values_are_copied_bitwise(tmp_path):
+    raw = np.array([1.0, np.nan, -0.0, np.inf, np.inf, -0.0, -np.inf, 2.0], dtype="<f4")
+    src = tmp_path / "rec.raw"
+    raw.tofile(src)
+    base = convert_iq(src, tmp_path / "out", "uhd-float", 1e6, 1e9, "x")
+    written = np.fromfile(tmp_path / "out.sigmf-data", dtype="<f4")
+    assert base == tmp_path / "out"
+    assert np.array_equal(written.view("<u4"), raw.view("<u4"))
+
+
+@pytest.mark.parametrize("name", ["out.sigmf-data", "out.sigmf-meta", "out.sigmf-data.tmp"])
+@pytest.mark.parametrize("overwrite", [False, True])
+def test_input_is_never_an_output(tmp_path, name, overwrite):
+    src = tmp_path / name
+    content = bytes([1, 2, 3, 4])
+    src.write_bytes(content)
+    with pytest.raises(ValueError, match="same file"):
+        convert_iq(src, tmp_path / "out", "hackrf", 1e6, 1e9, "x", overwrite=overwrite)
+    assert src.read_bytes() == content
+
+
+@pytest.mark.parametrize("rate", [0.0, -1e6, float("nan"), float("inf")])
+def test_invalid_sample_rate(tmp_path, capsys, rate):
+    src = tmp_path / "rec.raw"
+    src.write_bytes(bytes(4))
+    with pytest.raises(ValueError, match="sample rate"):
+        convert_iq(src, tmp_path / "out", "hackrf", rate, 1e9, "x")
+    args = ["convert", str(src), "-o", str(tmp_path / "o"), "--format", "hackrf"]
+    assert cli.main([*args, "--rate-sps", str(rate), "--freq-hz", "1e9", "--device", "d"]) == 2
+    assert "sample rate" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("freq", [float("nan"), float("inf")])
+def test_invalid_centre_frequency(tmp_path, freq):
+    src = tmp_path / "rec.raw"
+    src.write_bytes(bytes(4))
+    with pytest.raises(ValueError, match="centre frequency"):
+        convert_iq(src, tmp_path / "out", "hackrf", 1e6, freq, "x")
+
+
+def test_empty_input_is_an_error(tmp_path, capsys):
+    src = tmp_path / "rec.raw"
+    src.write_bytes(b"")
+    args = ["convert", str(src), "-o", str(tmp_path / "o"), "--format", "hackrf"]
+    assert cli.main([*args, "--rate-sps", "1e6", "--freq-hz", "1e9", "--device", "d"]) == 2
+    assert "empty" in capsys.readouterr().err
+    assert not (tmp_path / "o.sigmf-data").exists()
