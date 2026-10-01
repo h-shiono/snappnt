@@ -57,6 +57,7 @@ nav:
       - ESP-SDR protocol: design/espsdr-protocol.md
   - Guides:
       - Conducted test: guides/conducted-test.md
+      - Conducted test log template: guides/conducted-test-log-template.md
   - Results:
       - results/index.md
       - False-alarm rate: results/false-alarm.md
