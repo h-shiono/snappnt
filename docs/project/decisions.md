@@ -135,3 +135,23 @@ an earlier one and says so.
   0.5 dB; 10 dB is this project's choice, not a value from a source.
 - **Alternatives:** Reading noise figures from the device YAML files: no verified value exists
   there yet. A smaller margin such as 6 dB: the C/N0 error would be about 1 dB.
+
+## D-013 Frequency plans in the simulator (2026-10-01)
+
+- **Decision:** A scenario may set `frequency_plan: {lo_hz, lo_side, tuned_hz}`; the RF
+  frequency is the signal's `carrier_hz`. `baseband_offset_hz` is then the plan's value, and
+  giving it in the receiver section as well is an error. With a plan, the carrier offset in the
+  samples is `doppler_sign * doppler_hz`, where `doppler_sign` is −1 for a high-side LO. The
+  receiver crystal error (`clock_offset_ppm`) is applied to `tuned_hz`, because the crystal
+  drives the receiver's own LO. The external LO error (`lo_offset_ppm`, valid only with a plan)
+  is applied to `lo_hz` and shifts the IF by −δ for a low-side LO and +δ for a high-side LO
+  (δ = `lo_offset_ppm` · 1e-6 · `lo_hz`). Code Doppler keeps the RF sign. `snappnt sim` writes
+  `tuned_hz` as the SigMF centre frequency when a plan is present.
+- **Why:** IF = RF − LO (low side) or LO − RF (high side), so a shift of the LO moves the IF in
+  the opposite or the same direction. The mixer does not change the chip rate, so the code
+  rate follows the RF Doppler. Without a plan, nothing changes (the crystal error still
+  scales with `carrier_hz`).
+- **Alternatives:** Applying the crystal error to `carrier_hz` with a plan too: it would
+  describe a receiver tuned to the RF, which is not the case behind a mixer. `tuned_hz` equal
+  to the IF in the C-band scenarios is an assumption until a real receiver setup is chosen.
+

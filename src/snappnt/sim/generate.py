@@ -7,6 +7,13 @@ sqrt(10^(C/N0 / 10) / fs).
 Receiver clock model: one crystal drives both the LO and the ADC. An error of ``ppm``
 shifts the carrier by ``-ppm * carrier_hz`` and makes the true sample rate ``fs * (1 + ppm)``.
 
+With a frequency plan (external mixer) the carrier offset at baseband is
+``doppler_sign * doppler_hz - clock_offset_ppm * tuned_hz - doppler_sign * lo_offset_ppm * lo_hz``
+(ppm as 1e-6): the receiver crystal error acts on the tuned frequency, the external LO error
+moves the IF in the opposite direction of the LO shift for a low-side LO and in the same
+direction for a high-side LO. Code Doppler keeps the RF sign; the mixer does not change the
+code rate.
+
 Optional band limiting and decimation: when the receiver sets ``generate_rate_hz``, signal and
 noise are created at that rate (noise density still 1 / generate rate), low-pass filtered to
 ``analog_bandwidth_hz`` and reduced to ``sample_rate_hz``. Method ``none`` keeps every n-th
@@ -21,14 +28,29 @@ from typing import Any
 
 import numpy as np
 
+from snappnt.frontend.freqplan import FrequencyPlan
 from snappnt.signals import get_code, load_signal
 from snappnt.sim.impairments import decimate_without_filter, lowpass, quantize
 from snappnt.sim.scenario import Scenario
 
 
-def expected_frequency_offset_hz(scn: Scenario, doppler_hz: float, carrier_hz: float) -> float:
-    """Carrier offset the acquisition should find, relative to ``baseband_offset_hz``."""
-    return doppler_hz - scn.receiver.clock_offset_ppm * 1e-6 * carrier_hz
+def expected_frequency_offset_hz(
+    scn: Scenario,
+    doppler_hz: float,
+    carrier_hz: float,
+    plan: FrequencyPlan | None = None,
+) -> float:
+    """Carrier offset the acquisition should find, relative to ``baseband_offset_hz``.
+
+    ``plan`` defaults to the scenario's own frequency plan.
+    """
+    plan = scn.frequency_plan if plan is None else plan
+    rx = scn.receiver
+    if plan is None:
+        return doppler_hz - rx.clock_offset_ppm * 1e-6 * carrier_hz
+    sign = plan.doppler_sign
+    lo_shift_hz = rx.lo_offset_ppm * 1e-6 * (plan.lo_hz or 0.0)
+    return sign * doppler_hz - rx.clock_offset_ppm * 1e-6 * plan.tuned_hz - sign * lo_shift_hz
 
 
 def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
@@ -104,6 +126,20 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
         "clock_offset_ppm": rx.clock_offset_ppm,
         "quantization_bits": rx.quantization_bits,
         "seed": scn.seed,
+        **(
+            {
+                "frequency_plan": {
+                    "rf_hz": scn.frequency_plan.rf_hz,
+                    "lo_hz": scn.frequency_plan.lo_hz,
+                    "lo_side": scn.frequency_plan.lo_side,
+                    "tuned_hz": scn.frequency_plan.tuned_hz,
+                    "if_hz": scn.frequency_plan.if_hz,
+                },
+                "lo_offset_ppm": rx.lo_offset_ppm,
+            }
+            if scn.frequency_plan is not None
+            else {}
+        ),
         **(
             {
                 "generate_rate_hz": rx.generate_rate_hz,

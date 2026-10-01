@@ -44,6 +44,11 @@ If the mixer's local oscillator (LO) is above the signal frequency, the spectrum
 the intermediate frequency and a positive Doppler shift at the antenna appears as a negative
 shift in the samples. `FrequencyPlan.doppler_sign` expresses this.
 
+A scenario can carry a frequency plan (`frequency_plan` in the scenario YAML). The simulator
+then mirrors the Doppler shift for a high-side LO, applies the external LO error
+(`lo_offset_ppm`) separately from the receiver crystal error, and takes `baseband_offset_hz`
+from the plan, so acquisition needs no other input. See decision D-013.
+
 ### 3. Data format (`io`)
 
 Recordings use SigMF: a raw sample file plus a JSON metadata file. The simulator's truth is

@@ -1,0 +1,14 @@
+# Same signal, high-side LO: IF = 7504 - 5020 = 2484 MHz. The spectrum is mirrored, so the
+# positive Doppler of +20 kHz appears as -20 kHz in the samples.
+name: cband_bpsk_generic_highside
+signal: cband_bpsk_generic
+seed: 3
+frequency_plan: {lo_hz: 7504000000, lo_side: high, tuned_hz: 2484000000}
+receiver:
+  sample_rate_hz: 8184000
+  n_samples: 32736          # 4 ms
+  clock_offset_ppm: 0
+  lo_offset_ppm: 0
+  quantization_bits: null
+satellites:
+  - {prn: 5, cn0_dbhz: 48, doppler_hz: 20000, code_phase_chips: 500.4}
