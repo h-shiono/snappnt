@@ -8,6 +8,7 @@ namespace, declared in ``core:extensions`` as SigMF requires.
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -38,11 +39,25 @@ def _with(base: Path, suffix: str) -> Path:
 def _replace_pair(pairs: list[tuple[Path, Path]]) -> None:
     """Rename each ``(temporary, final)`` pair into place so that all succeed or none does.
 
-    An existing final file is first moved to a backup name (``.bak`` added). If any rename
-    fails, the files already placed are removed, the backups are moved back and the error is
-    raised, so an existing recording stays complete. The backups are deleted after every
-    rename has succeeded. If moving a backup back fails too, the remaining backups are kept
-    and the raised error names them."""
+    An existing final file is first moved to a backup name (``.bak`` added). If a backup name
+    is already taken, for example by files kept after an earlier failed restore, nothing is
+    changed and ``FileExistsError`` names them. If any rename fails, the files already placed
+    are removed, then the backups are moved back and the error is raised, so an existing
+    recording stays complete. Each cleanup step is tried even if an earlier one failed. If a
+    placed file cannot be removed, no backup is moved back (a restored old file next to a new
+    one would be a readable pair of different recordings); the backups are kept instead. Backups
+    that could not be moved back are kept in any case, and the raised error names them.
+
+    The backups are deleted after every rename has succeeded. A backup that cannot be deleted
+    does not make the write fail: the new files are complete, so a warning names the backup."""
+    taken = [f.with_name(f.name + ".bak") for _, f in pairs]
+    taken = [b for b in taken if b.exists()]
+    if taken:
+        names = ", ".join(str(b) for b in taken)
+        raise FileExistsError(
+            f"backup files from an earlier failed write exist: {names}; "
+            "recover the old recording from them or delete them, then write again"
+        )
     backups: dict[Path, Path] = {}
     placed: list[Path] = []
     try:
@@ -55,23 +70,32 @@ def _replace_pair(pairs: list[tuple[Path, Path]]) -> None:
             tmp.replace(final)
             placed.append(final)
     except OSError:
-        stuck: list[Path] = []
+        kept: list[Path] = []
         for final in placed:
-            if final not in backups:
-                final.unlink(missing_ok=True)
-        for final, backup in backups.items():
             try:
-                backup.replace(final)
+                final.unlink(missing_ok=True)
             except OSError:
-                stuck.append(backup)
-        if stuck:
-            names = ", ".join(str(b) for b in stuck)
+                kept.extend(backups.values())
+                break
+        if not kept:
+            for final, backup in backups.items():
+                try:
+                    backup.replace(final)
+                except OSError:
+                    kept.append(backup)
+        if kept:
+            names = ", ".join(str(b) for b in kept)
             raise OSError(
                 f"could not restore the previous recording; its files are kept as {names}"
             ) from None
         raise
     for backup in backups.values():
-        backup.unlink(missing_ok=True)
+        try:
+            backup.unlink(missing_ok=True)
+        except OSError as e:
+            warnings.warn(
+                f"new recording written, but could not delete {backup}: {e}", stacklevel=2
+            )
 
 
 def write_sigmf(
@@ -95,7 +119,11 @@ def write_sigmf(
     moved to backup names (``.bak`` added) during the rename and deleted after both new files
     are in place. If anything fails, the temporary files are removed and the existing recording
     is restored complete. Only if that restore fails too are the ``.bak`` files kept, and the
-    raised error names them."""
+    raised error names them. While the rename runs, the final paths of an existing recording are
+    briefly missing, so a reader in another process can fail with ``FileNotFoundError``. A
+    ``.bak`` file left by an earlier failed write makes this function raise ``FileExistsError``
+    before changing anything. If only deleting a backup fails, the write succeeds and a warning
+    names the backup."""
     base = _base(path)
     base.parent.mkdir(parents=True, exist_ok=True)
     x = np.asarray(samples)

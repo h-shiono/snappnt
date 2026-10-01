@@ -99,3 +99,89 @@ def test_failed_restore_keeps_backups_and_names_them(tmp_path, monkeypatch):
     monkeypatch.undo()
     names = sorted(p.name for p in tmp_path.iterdir())
     assert names == ["x.sigmf-data.bak", "x.sigmf-meta.bak"]
+
+
+def test_partial_restore_never_leaves_mismatched_pair(tmp_path, monkeypatch):
+    import numpy as np
+    import pytest
+
+    from snappnt.io import sigmf_io
+
+    old, _ = _old_recording(tmp_path)
+    real = sigmf_io.Path.replace
+
+    def replace(self, target):
+        # Placing the metadata fails; restoring the data backup fails, the metadata one works.
+        if self.name == "x.sigmf-meta.tmp" or self.name == "x.sigmf-data.bak":
+            raise OSError("rename failed")
+        return real(self, target)
+
+    monkeypatch.setattr(sigmf_io.Path, "replace", replace)
+    with pytest.raises(OSError, match=r"kept as .*x\.sigmf-data\.bak"):
+        sigmf_io.write_sigmf(tmp_path / "x", np.ones(4, np.complex64), 2e6)
+    monkeypatch.undo()
+    assert not (tmp_path / "x.sigmf-data").exists()
+    assert (tmp_path / "x.sigmf-data.bak").exists()
+    assert np.array_equal(np.fromfile(tmp_path / "x.sigmf-data.bak", dtype="<c8"), old)
+
+
+def test_unremovable_placed_file_keeps_all_backups(tmp_path, monkeypatch):
+    import numpy as np
+    import pytest
+
+    from snappnt.io import sigmf_io
+
+    _old_recording(tmp_path)
+    _fail_nth_replace(monkeypatch, 4)
+
+    real = sigmf_io.Path.unlink
+
+    def unlink(self, missing_ok=False):
+        if self.name.endswith(".tmp"):
+            return real(self, missing_ok=missing_ok)
+        raise OSError("cannot remove")
+
+    monkeypatch.setattr(sigmf_io.Path, "unlink", unlink)
+    with pytest.raises(OSError, match=r"kept as .*x\.sigmf-data\.bak.*x\.sigmf-meta\.bak"):
+        sigmf_io.write_sigmf(tmp_path / "x", np.ones(4, np.complex64), 2e6)
+    monkeypatch.undo()
+    assert not (tmp_path / "x.sigmf-meta").exists()
+    assert (tmp_path / "x.sigmf-meta.bak").exists()
+    assert (tmp_path / "x.sigmf-data.bak").exists()
+
+
+def test_existing_backup_is_never_overwritten(tmp_path):
+    import numpy as np
+    import pytest
+
+    from snappnt.io import sigmf_io
+
+    _old_recording(tmp_path)
+    (tmp_path / "x.sigmf-meta.bak").write_text("saved", encoding="utf-8")
+    before = sorted(p.name for p in tmp_path.iterdir())
+    with pytest.raises(FileExistsError, match=r"x\.sigmf-meta\.bak"):
+        sigmf_io.write_sigmf(tmp_path / "x", np.ones(4, np.complex64), 2e6)
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+    assert (tmp_path / "x.sigmf-meta.bak").read_text(encoding="utf-8") == "saved"
+
+
+def test_failed_backup_delete_warns_but_write_succeeds(tmp_path, monkeypatch):
+    import numpy as np
+    import pytest
+
+    from snappnt.io import sigmf_io
+
+    _old_recording(tmp_path)
+    real = sigmf_io.Path.unlink
+
+    def unlink(self, missing_ok=False):
+        if self.name.endswith(".bak"):
+            raise OSError("cannot delete")
+        return real(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(sigmf_io.Path, "unlink", unlink)
+    new = np.ones(4, np.complex64)
+    with pytest.warns(UserWarning, match=r"could not delete .*\.bak"):
+        sigmf_io.write_sigmf(tmp_path / "x", new, 2e6)
+    monkeypatch.undo()
+    assert np.array_equal(sigmf_io.read_sigmf(tmp_path / "x")[0], new)
