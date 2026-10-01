@@ -48,7 +48,7 @@ tone, and that the simulate–acquire–compare loop passes for both methods.
 ## Conditions
 
 All sweeps use one satellite (PRN 10), 16 384 output samples (about 4.1 ms), a clock error of
-−8 ppm, no quantization, a frequency search of ±40 kHz, 4 blocks combined non-coherently
+−8 ppm, 10-bit quantization (the ESP32-C61 device setting, with the default AGC backoff), a frequency search of ±40 kHz, 4 blocks combined non-coherently
 (each about 1 ms), `pfa` = 1e-3, 200 trials per C/N0 point and `--seed 0`. These are the
 settings of the "ESP32-C61, 4 MSa/s, 4 blocks" curve on
 [Detection probability versus C/N0](pd-curves.md), which serves as the reference (direct

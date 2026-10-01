@@ -128,3 +128,24 @@ def test_ideal_decimation_does_not_depend_on_wider_analog_bandwidth():
     x13, _ = generate(_noise_only("ideal", 13e6))
     x20, _ = generate(_noise_only("ideal", 20e6))
     assert np.allclose(x13, x20, atol=1e-5)
+
+
+def _receiver(**extra):
+    return {
+        "name": "bad",
+        "signal": "navic_s_sps",
+        "receiver": {"sample_rate_hz": 4e6, "n_samples": 1024, **extra},
+    }
+
+
+def test_fractional_decimation_factor_raises():
+    d = _receiver(decimation={"factor": 20.5, "method": "none"})
+    with pytest.raises(ValueError, match="integer"):
+        scenario_from_dict(d)
+
+
+@pytest.mark.parametrize("bandwidth_hz", [0, -1e6])
+def test_non_positive_analog_bandwidth_raises(bandwidth_hz):
+    d = _receiver(analog_bandwidth_hz=bandwidth_hz, decimation={"factor": 20, "method": "ideal"})
+    with pytest.raises(ValueError, match="positive"):
+        scenario_from_dict(d)

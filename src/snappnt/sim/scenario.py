@@ -7,7 +7,7 @@ Scenarios are YAML files (see ``scenarios/``). Example::
     seed: 1
     receiver:
       device: esp32c3          # optional; fills sample rate / bits / capture length
-      sample_rate_hz: 80000000
+      sample_rate_hz: 4000000
       n_samples: 16384
       baseband_offset_hz: 0    # carrier position in baseband from the frequency plan
       clock_offset_ppm: 12.0   # receiver crystal error (shifts carrier and sample clock)
@@ -84,7 +84,10 @@ def _decimation_from_dict(
         return None, None, None
     if dec is None:
         raise ValueError("receiver.generate_rate_hz needs receiver.decimation")
-    factor = int(dec["factor"])
+    raw_factor = dec["factor"]
+    factor = int(raw_factor)
+    if factor != raw_factor:
+        raise ValueError(f"decimation.factor must be an integer, not {raw_factor}")
     method = str(dec.get("method", "none"))
     if factor < 1:
         raise ValueError("decimation.factor must be at least 1")
@@ -120,6 +123,8 @@ def _receiver_from_dict(d: dict[str, Any]) -> ReceiverConfig:
     sample_rate_hz = float(d["sample_rate_hz"])
     generate_rate_hz, factor, method = _decimation_from_dict(d, sample_rate_hz)
     bandwidth = d.get("analog_bandwidth_hz")
+    if bandwidth is not None and float(bandwidth) <= 0:
+        raise ValueError(f"analog_bandwidth_hz must be positive, not {bandwidth}")
     return ReceiverConfig(
         sample_rate_hz=sample_rate_hz,
         n_samples=int(d["n_samples"]),
