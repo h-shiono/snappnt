@@ -19,6 +19,20 @@ def quantize(x: np.ndarray, bits: int, backoff_db: float = 12.0) -> np.ndarray:
     return (i + 1j * q).astype(np.complex64)
 
 
+def lowpass(x: np.ndarray, fs_hz: float, bandwidth_hz: float) -> np.ndarray:
+    """Brick-wall low-pass of a complex baseband signal, passband +-``bandwidth_hz`` / 2.
+
+    Applied in the frequency domain over the whole snapshot (no filter transient, no ripple).
+    A bandwidth at or above ``fs_hz`` leaves the signal unchanged.
+    """
+    if bandwidth_hz >= fs_hz:
+        return x
+    spectrum = np.fft.fft(x)
+    freqs = np.fft.fftfreq(len(x), d=1.0 / fs_hz)
+    spectrum[np.abs(freqs) > bandwidth_hz / 2.0] = 0.0
+    return np.fft.ifft(spectrum)
+
+
 def decimate_without_filter(x: np.ndarray, factor: int) -> np.ndarray:
     """Keep every ``factor``-th sample, with no anti-alias filter.
 

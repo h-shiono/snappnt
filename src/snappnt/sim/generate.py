@@ -6,6 +6,13 @@ sqrt(10^(C/N0 / 10) / fs).
 
 Receiver clock model: one crystal drives both the LO and the ADC. An error of ``ppm``
 shifts the carrier by ``-ppm * carrier_hz`` and makes the true sample rate ``fs * (1 + ppm)``.
+
+Optional band limiting and decimation: when the receiver sets ``generate_rate_hz``, signal and
+noise are created at that rate (noise density still 1 / generate rate), low-pass filtered to
+``analog_bandwidth_hz`` and reduced to ``sample_rate_hz``. Method ``none`` keeps every n-th
+sample, so noise from the whole analog bandwidth folds into the output band; method ``ideal``
+low-pass filters to the output band first. Without these keys the samples are created
+directly at ``sample_rate_hz``.
 """
 
 from __future__ import annotations
@@ -15,7 +22,7 @@ from typing import Any
 import numpy as np
 
 from snappnt.signals import get_code, load_signal
-from snappnt.sim.impairments import quantize
+from snappnt.sim.impairments import decimate_without_filter, lowpass, quantize
 from snappnt.sim.scenario import Scenario
 
 
@@ -32,15 +39,20 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
 
     n = rx.n_samples
     fs_nominal = rx.sample_rate_hz
-    fs_true = fs_nominal * (1.0 + rx.clock_offset_ppm * 1e-6)
-    t = np.arange(n) / fs_true
+    # Rate at which signal and noise are created: the output rate unless a higher one is set.
+    if rx.generate_rate_hz is None:
+        fs_gen, n_gen = fs_nominal, n
+    else:
+        fs_gen, n_gen = rx.generate_rate_hz, n * rx.decimation_factor
+    fs_true = fs_gen * (1.0 + rx.clock_offset_ppm * 1e-6)
+    t = np.arange(n_gen) / fs_true
 
-    x = (rng.standard_normal(n) + 1j * rng.standard_normal(n)) / np.sqrt(2.0)
+    x = (rng.standard_normal(n_gen) + 1j * rng.standard_normal(n_gen)) / np.sqrt(2.0)
 
     truth_sats = []
     for sat in scn.satellites:
         code = get_code(spec, sat.prn)
-        amp = np.sqrt(10 ** (sat.cn0_dbhz / 10.0) / fs_nominal)
+        amp = np.sqrt(10 ** (sat.cn0_dbhz / 10.0) / fs_gen)
 
         # Code: chip rate scaled by the Doppler of the carrier (code Doppler).
         code_rate = spec.chip_rate_hz * (1.0 + sat.doppler_hz / spec.carrier_hz)
@@ -73,6 +85,13 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
             }
         )
 
+    if rx.generate_rate_hz is not None:
+        if rx.analog_bandwidth_hz is not None:
+            x = lowpass(x, fs_gen, rx.analog_bandwidth_hz)
+        if rx.decimation_method == "ideal":
+            x = lowpass(x, fs_gen, fs_nominal)
+        x = decimate_without_filter(x, rx.decimation_factor)
+
     if rx.quantization_bits is not None:
         x = quantize(x, rx.quantization_bits, rx.agc_backoff_db)
 
@@ -85,6 +104,16 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
         "clock_offset_ppm": rx.clock_offset_ppm,
         "quantization_bits": rx.quantization_bits,
         "seed": scn.seed,
+        **(
+            {
+                "generate_rate_hz": rx.generate_rate_hz,
+                "decimation_factor": rx.decimation_factor,
+                "decimation_method": rx.decimation_method,
+                "analog_bandwidth_hz": rx.analog_bandwidth_hz,
+            }
+            if rx.generate_rate_hz is not None
+            else {}
+        ),
         "satellites": truth_sats,
     }
     return x.astype(np.complex64), truth
