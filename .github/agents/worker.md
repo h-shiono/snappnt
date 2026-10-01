@@ -14,16 +14,22 @@ Do **exactly one step** for **one issue**, then stop. Find the issue in progress
 `gh issue list --state open --label <status label>` and act on the first match, in this order:
 
 1. **`status:in-review`** — the issue has an open pull request from you
-   (`Closes #<issue>` in its body). Read the pull request: CI results, Greptile review
-   comments, comments tagged `**[orchestrator]**`, and untagged comments from the maintainer
-   (see below) that are newer than your last `**[worker]**` comment. For each finding, either
-   fix it or reply in its thread with the reason it is not a problem, citing code, a test or a document.
-   Commit the fixes on the same branch and push. If your latest comment on the pull request is
-   a `Progress:` comment (see "Time limit") and the orchestrator has since told you to
-   continue, finish the work it lists. Otherwise, if there is nothing new since your last
-   comment, stop without changes. After every push in this step, post a pull request comment
-   listing the pushed commit and what it fixed; this keeps a finished `Progress:` comment from
-   being your latest comment, so a later run does not repeat that work.
+   (`Closes #<issue>` in its body). Decide what is open from the current state of the pull
+   request, not from comment times (a review can arrive while you work):
+   - each review thread (Greptile, `**[orchestrator]**` or the maintainer, see below) whose
+     last comment is not yours;
+   - each pull request comment tagged `**[orchestrator]**` or untagged from the maintainer
+     that no later `**[worker]**` comment answers by linking to it;
+   - failing CI on the head commit;
+   - the items left in your latest `Progress:` comment (see "Time limit"), unless a later
+     `Pushed:` comment from you says that `Progress:` comment is done.
+
+   For each open finding, either fix it or reply in its thread with the reason it is not a
+   problem, citing code, a test or a document; answer conversation comments with a comment
+   that links to them. Commit the fixes on the same branch and push. After every push, post a
+   pull request comment starting with `**[worker]**`, a blank line, then `Pushed:` with the
+   commit, what it fixed (linking each thread or comment), and, if it finishes a `Progress:`
+   comment, that this `Progress:` comment is done. If nothing is open, stop without changes.
 2. **`status:plan-approved`** — implement the approved plan on a branch named
    `issue-<number>-<short-description>`. If such a branch already exists on `origin` (an
    earlier run was stopped), check it out and continue from it instead of starting over; your
@@ -57,7 +63,8 @@ pushed by then is lost. Check the time with `date -u` before each long step.
   fit; say on the result page and in the pull request which size was used and why.
 - If the remaining work cannot finish before the limit, push what is done and post a comment
   starting with `**[worker]**`, a blank line, then `Progress:` followed by what is done, what
-  is left and the branch name. Post it on the issue while implementing the plan, and on the
+  is left and the branch name. Post it as the last comment of the run, after any `Pushed:`
+  comment. Post it on the issue while implementing the plan, and on the
   pull request while fixing review findings. Keep the label. The orchestrator replies in the
   same place, and that reply starts the next run, which continues from the branch.
 - While implementing the plan: if the issue already has three `Progress:` comments from you,
