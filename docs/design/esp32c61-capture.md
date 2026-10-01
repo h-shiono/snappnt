@@ -52,7 +52,11 @@ What is not known:
   question, if the register is documented at all.
 - What would settle it by measurement: the noise floor and a tone alias check at each rate
   index, as in [Aliasing loss](../results/aliasing-loss.md). If noise folds into the band at
-  4 MS/s, the clock is only divided.
+  4 MS/s, the band limiting before the clock division is insufficient at that rate. This
+  does not show that the clock is only divided, because the configurable receive filters
+  above could give partial filtering without preventing folding. Absence of folding would
+  show that some band limiting exists, and its transition band would still have to be
+  measured.
 
 ## How the capture memory works: there is no ring buffer
 
@@ -74,6 +78,11 @@ What is not known:
   (`chip.h:25`, `:40`).
 - The C61 firmware path does not use PSRAM: `receiver.c` and `chip.h` contain no PSRAM
   access or initialisation.
+- The comment "two banks form a ring buffer" in `frontend/devices/esp32c61.yaml` is not
+  supported by this firmware source: the firmware uses one bank and keeps no write pointer.
+  Whether the hardware can use two banks as a ring buffer is not stated in the firmware, and
+  is not known. The comment is therefore an unverified statement, not a capability the
+  current firmware uses.
 - Consecutive captures have gaps, because the host drains the buffer over USB between them
   (`receiver.c:254-257`; firmware `README.md:135`).
 
