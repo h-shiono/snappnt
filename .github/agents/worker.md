@@ -21,15 +21,38 @@ Do **exactly one step** for **one issue**, then stop. Find the issue in progress
    Commit the fixes on the same branch and push. If there is nothing new since your last
    comment, stop without changes.
 2. **`status:plan-approved`** — implement the approved plan on a branch named
-   `issue-<number>-<short-description>`. Run all checks listed in `CLAUDE.md`. Push the branch
-   and open a pull request with `gh pr create`, following `.github/pull_request_template.md`,
-   with `Closes #<number>`. Then replace the label with `status:in-review`.
+   `issue-<number>-<short-description>`. If such a branch already exists on `origin` (an
+   earlier run was stopped), check it out and continue from it instead of starting over; your
+   latest `Progress:` comment on the issue (see "Time limit") says what is left. Run all checks listed
+   in `CLAUDE.md`. Push the branch and open a pull request with `gh pr create`, following
+   `.github/pull_request_template.md`, with `Closes #<number>`. Then replace the label with
+   `status:in-review`.
 3. **`status:ready`** — post a plan as an issue comment (files to change, tests to add, how
    each acceptance criterion will be checked, open questions), then replace the label with
    `status:plan-proposed`. If a comment tagged `**[orchestrator]**` returned an earlier plan,
    address every requested change.
 
 If no issue has one of these labels, stop without changes.
+
+## Time limit
+
+GitHub stops the job 120 minutes after the start time given in the prompt, and anything not
+pushed by then is lost. Check the time with `date -u` before each long step.
+
+- Commit and push the branch as soon as a part of the work is complete and its tests pass
+  (for example the code and tests, before running result sweeps). Never leave more than about
+  30 minutes of work unpushed.
+- Before a long computation (a detection-probability sweep, many trials, a large simulation),
+  run a small version first, time it, and size the full run so that it ends at least 30
+  minutes before the limit. Run it under `timeout` with that budget. If the full size does not
+  fit, use the largest size that does, and state the size used and the reason on the result
+  page and in the pull request.
+- If the remaining work cannot finish before the limit, push what is done and post an issue
+  comment starting with `**[worker]**`, a blank line, then `Progress:` followed by what is
+  done, what is left and the branch name. Keep the label. The orchestrator replies, and that
+  reply starts the next run, which continues from the branch.
+- If the issue already has three `Progress:` comments from you and still no pull request,
+  do not continue: report it in the issue and set `status:blocked`.
 
 ## Rules for this run
 

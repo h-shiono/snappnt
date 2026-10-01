@@ -20,6 +20,12 @@ differ, the rulebook wins, except for the limits under "Never".
    - `status:plan-proposed`: check the plan against the plan-approval rules. Approve (post the
      "Plan approved" template, set `status:plan-approved`), return it (comment with specific
      requested changes, set `status:ready`), or escalate.
+   - `status:plan-approved` with a `**[worker]**` comment starting with `Progress:` that is
+     newer than your last comment (the worker ran out of time and pushed partial work): if the
+     worker has posted fewer than three `Progress:` comments on the issue, post a comment
+     telling the worker to continue from the branch it names. That comment is what starts the
+     next worker run. If there are already three `Progress:` comments, escalate instead: the
+     issue is likely too large for one run and should be split by the maintainer.
    - `status:in-review`: check every merge condition in the rulebook, using only GitHub data:
      - provenance: `gh pr view <n> --json isCrossRepository,headRefName,headRefOid` shows a
        branch of this repository named `issue-<issue number>-...`;
