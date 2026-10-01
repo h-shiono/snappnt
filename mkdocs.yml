@@ -61,6 +61,7 @@ nav:
       - False-alarm rate: results/false-alarm.md
       - Detection probability: results/pd-curves.md
       - Noise-folding loss: results/aliasing-loss.md
+      - C/N0 estimate bias: results/cn0-bias.md
   - Project:
       - Milestones: project/milestones.md
       - Decision log: project/decisions.md

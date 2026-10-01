@@ -22,6 +22,11 @@ Detection: under noise alone each cell's normalised power follows a Gamma(B, 1/B
 distribution (B = n_blocks). The threshold is set so that the probability of any false
 peak over the whole search grid is ``pfa``.
 
+Refinement: with ``refine=True`` the code phase and frequency of the peak cell are refined by
+three-point parabolic interpolation of the power grid (see ``parabolic_offset``). Only the
+reported ``code_phase_chips`` and ``freq_offset_hz`` change; the detection metric, the
+threshold and the C/N0 estimate are those of the peak cell.
+
 Not yet modelled: code Doppler within the snapshot (negligible for captures of a few ms),
 Doppler-rate search (parameter accepted, applied as a fixed hypothesis).
 """
@@ -60,6 +65,18 @@ def detection_threshold(n_cells: int, n_blocks: int, pfa: float) -> float:
     return float(stats.gamma.isf(pfa / n_cells, a=n_blocks, scale=1.0 / n_blocks))
 
 
+def parabolic_offset(y_minus: float, y_zero: float, y_plus: float) -> float:
+    """Vertex of the parabola through three equally spaced samples, in sample spacings.
+
+    ``y_zero`` is the largest of the three. The result lies in [-0.5, 0.5]; it is 0 when the
+    three values are on a straight line (no curvature).
+    """
+    denom = y_minus - 2.0 * y_zero + y_plus
+    if denom >= 0.0:
+        return 0.0
+    return float(np.clip(0.5 * (y_minus - y_plus) / denom, -0.5, 0.5))
+
+
 def acquire(
     x: np.ndarray,
     fs: float,
@@ -72,11 +89,16 @@ def acquire(
     doppler_rate_hzps: float = 0.0,
     n_blocks: int = 1,
     pfa: float = 1e-3,
+    refine: bool = False,
 ) -> AcqResult:
     """Search one PRN.
 
     ``center_offset_hz`` is where the carrier would sit with zero Doppler and zero clock error
     (the frequency plan's baseband offset). ``freq_range_hz`` is searched around it.
+
+    ``refine`` interpolates the peak between grid points along code phase and frequency. It
+    changes only ``code_phase_chips`` and ``freq_offset_hz``. No frequency refinement is made
+    when the peak is on the edge of the searched range.
     """
     x = np.asarray(x, dtype=np.complex64)
     n = x.size
@@ -120,11 +142,18 @@ def acquire(
     snr = max(metric - 1.0, 1e-12)
     cn0 = 10.0 * np.log10(snr / t_coh)
 
+    lag = float(ki)
+    freq_hz = float(freqs[fi])
+    if refine:
+        lag += parabolic_offset(power[fi, (ki - 1) % k], power[fi, ki], power[fi, (ki + 1) % k])
+        if 0 < fi < freqs.size - 1:
+            freq_hz += step * parabolic_offset(power[fi - 1, ki], power[fi, ki], power[fi + 1, ki])
+
     return AcqResult(
         prn=prn,
         detected=metric > thr,
-        code_phase_chips=float((ki * spec.chip_rate_hz / fs) % spec.code_length),
-        freq_offset_hz=float(freqs[fi]),
+        code_phase_chips=float((lag * spec.chip_rate_hz / fs) % spec.code_length),
+        freq_offset_hz=freq_hz,
         metric=metric,
         threshold=thr,
         cn0_dbhz_est=float(cn0),
