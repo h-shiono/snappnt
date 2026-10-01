@@ -36,6 +36,16 @@ class DeviceSpec:
         n = self.raw.get("max_capture_samples")
         return None if n is None else int(n)
 
+    @property
+    def analog_bandwidth_hz(self) -> float | None:
+        """Analog bandwidth; when the YAML gives [lower, upper] bounds, the lower bound."""
+        bw = self.raw.get("analog_bandwidth_hz")
+        if bw is None:
+            return None
+        if isinstance(bw, (list, tuple)):
+            return float(bw[0])
+        return float(bw)
+
 
 def list_devices() -> list[str]:
     files = resources.files(_DEVICES_PACKAGE).iterdir()
