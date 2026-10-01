@@ -110,8 +110,11 @@ def _receiver_from_dict(d: dict[str, Any]) -> ReceiverConfig:
         d.setdefault("quantization_bits", dev.adc_bits)
         if dev.max_capture_samples is not None:
             d.setdefault("n_samples", dev.max_capture_samples)
-        if dev.analog_bandwidth_hz is not None:
-            d.setdefault("analog_bandwidth_hz", dev.analog_bandwidth_hz)
+        bandwidth = dev.raw.get("analog_bandwidth_hz")
+        if bandwidth is not None:
+            # The device file may give [lower, upper] bounds; the lower bound is used.
+            lower = bandwidth[0] if isinstance(bandwidth, (list, tuple)) else bandwidth
+            d.setdefault("analog_bandwidth_hz", lower)
     if d.get("sample_rate_hz") is None or d.get("n_samples") is None:
         raise ValueError("receiver needs sample_rate_hz and n_samples (directly or via device)")
     sample_rate_hz = float(d["sample_rate_hz"])
