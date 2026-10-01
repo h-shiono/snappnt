@@ -21,7 +21,9 @@ Do **exactly one step** for **one issue**, then stop. Find the issue in progress
    Commit the fixes on the same branch and push. If your latest comment on the pull request is
    a `Progress:` comment (see "Time limit") and the orchestrator has since told you to
    continue, finish the work it lists. Otherwise, if there is nothing new since your last
-   comment, stop without changes.
+   comment, stop without changes. After every push in this step, post a pull request comment
+   listing the pushed commit and what it fixed; this keeps a finished `Progress:` comment from
+   being your latest comment, so a later run does not repeat that work.
 2. **`status:plan-approved`** — implement the approved plan on a branch named
    `issue-<number>-<short-description>`. If such a branch already exists on `origin` (an
    earlier run was stopped), check it out and continue from it instead of starting over; your
