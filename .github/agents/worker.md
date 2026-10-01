@@ -54,8 +54,10 @@ Every run that changes anything ends in exactly one of these ways, and nothing e
 
 - `status:plan-approved`: the pull request is open and the label is `status:in-review`;
 - `status:ready`: the plan is posted and the label is `status:plan-proposed`;
-- `status:in-review`: every open item is answered and a `Pushed:` comment lists the push;
-- any step: a `Progress:` comment (see "Time limit") or a stop-condition report.
+- `status:in-review`: every open item is answered, either by a fix (and a `Pushed:` comment
+  lists the push) or by a reasoned reply when no change is needed;
+- any step: a `Progress:` comment (see "Time limit"), or a report in the issue with
+  `status:blocked` (a stop condition, or the three-`Progress:` limit).
 
 Keep working until one of these holds. Ending the run any other way (for example after a
 commit and push with time left) leaves the issue with no event to start the next run.

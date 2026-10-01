@@ -64,7 +64,8 @@ Loops are prevented by the workflows' start conditions instead:
   and review comments on pull requests whose branch is not named `issue-...` (for example a
   maintainer's change to the workflows), because those have no issue for it to work on.
 - A worker run ends only when its step is finished (pull request opened, plan posted, review
-  items answered) or with a `Progress:` comment. A run that stopped after a partial push would
+  items answered by fixes or reasoned replies), with a `Progress:` comment, or with the issue
+  set to `status:blocked` and a report (a stop condition or the three-`Progress:` limit). A run that stopped after a partial push would
   leave no event to start the next run.
 - Each role has its own concurrency group, so at most one worker and one orchestrator run at a
   time. Extra events wait; GitHub keeps only the newest waiting run per group, which is enough
