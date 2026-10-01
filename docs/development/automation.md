@@ -30,7 +30,10 @@ The hand-off between the two is event-driven. A typical issue:
    removes its `status:*` label and selects the next issue; if GitHub has not closed the issue
    yet, the next run does this.
 
-The hourly runs catch anything an event missed.
+The hourly runs are meant to catch anything an event missed, but GitHub delays or drops
+scheduled runs when it is busy (on the first day only two of the hourly runs fired), so every
+hand-off should have an event of its own. If work seems stuck, start the agent by hand from the
+Actions tab ("Run workflow").
 
 Two details keep the hand-offs moving without the maintainer:
 
@@ -38,7 +41,9 @@ Two details keep the hand-offs moving without the maintainer:
   `["open", "push"]`, so each fix the worker pushes gets a new review, and the orchestrator can
   require a review of the exact head commit before merging. If no review of the head commit
   has appeared two hours after CI finished on it, the orchestrator escalates rather than
-  waiting indefinitely.
+  waiting indefinitely. When a review finds nothing new, Greptile only edits its summary
+  comment and submits no pull request review, so the orchestrator also starts when that
+  summary comment is created or edited.
 - **Commits carry the maintainer's identity.** The action sets the git author itself
   (`claude[bot]` by default). The worker workflow passes the repository owner as `bot_name` and
   `bot_id`, so commits are authored with the owner's GitHub no-reply address and match the
