@@ -158,3 +158,20 @@ an earlier one and says so.
   describe a receiver tuned to the RF, which is not the case behind a mixer. `tuned_hz` equal
   to the IF in the C-band scenarios is an assumption until a real receiver setup is chosen.
 
+## D-014 SigMF pair replacement uses backup and restore (2026-10-01)
+
+- **Decision:** `write_sigmf` writes both files under `.tmp` names. If a recording with the same
+  base name exists, it moves its two files to `.bak` names, renames the new files into place,
+  and deletes the backups only after both renames have succeeded. If any step fails, it removes
+  the files it placed, moves the backups back and removes the temporary files, so the old
+  recording stays complete and readable. If moving a backup back fails too, the `.bak` files are
+  kept and the raised error names them, so the old recording can be recovered by hand. This is
+  the only case in which a temporary or backup file remains. SigMF keys and file formats do not
+  change.
+- **Why:** Two renames cannot be made atomic together. Before this change, a failure of the
+  second rename left the new samples next to the old metadata, a pair that reads without error
+  but describes the wrong samples.
+- **Alternatives:** Renaming the metadata first leaves the old samples paired with the new
+  metadata when the data rename fails, which is the same mismatch in the other direction.
+  Refusing `--overwrite` when the metadata file cannot be replaced is a check made in advance,
+  and it does not cover a failure between the two renames.

@@ -35,6 +35,45 @@ def _with(base: Path, suffix: str) -> Path:
     return base.with_name(base.name + suffix)
 
 
+def _replace_pair(pairs: list[tuple[Path, Path]]) -> None:
+    """Rename each ``(temporary, final)`` pair into place so that all succeed or none does.
+
+    An existing final file is first moved to a backup name (``.bak`` added). If any rename
+    fails, the files already placed are removed, the backups are moved back and the error is
+    raised, so an existing recording stays complete. The backups are deleted after every
+    rename has succeeded. If moving a backup back fails too, the remaining backups are kept
+    and the raised error names them."""
+    backups: dict[Path, Path] = {}
+    placed: list[Path] = []
+    try:
+        for _, final in pairs:
+            if final.exists():
+                backup = final.with_name(final.name + ".bak")
+                final.replace(backup)
+                backups[final] = backup
+        for tmp, final in pairs:
+            tmp.replace(final)
+            placed.append(final)
+    except OSError:
+        stuck: list[Path] = []
+        for final in placed:
+            if final not in backups:
+                final.unlink(missing_ok=True)
+        for final, backup in backups.items():
+            try:
+                backup.replace(final)
+            except OSError:
+                stuck.append(backup)
+        if stuck:
+            names = ", ".join(str(b) for b in stuck)
+            raise OSError(
+                f"could not restore the previous recording; its files are kept as {names}"
+            ) from None
+        raise
+    for backup in backups.values():
+        backup.unlink(missing_ok=True)
+
+
 def write_sigmf(
     path: str | Path,
     samples: np.ndarray,
@@ -52,8 +91,11 @@ def write_sigmf(
 
     ``extra_capture`` adds keys to the capture segment (for example ``core:datetime``). The
     sample file and the metadata file are first written under temporary names (``.tmp`` added)
-    and renamed only when both are complete. If anything fails, the temporary files are removed
-    and an existing recording with the same base name is left untouched."""
+    and renamed only when both are complete. An existing recording with the same base name is
+    moved to backup names (``.bak`` added) during the rename and deleted after both new files
+    are in place. If anything fails, the temporary files are removed and the existing recording
+    is restored complete. Only if that restore fails too are the ``.bak`` files kept, and the
+    raised error names them."""
     base = _base(path)
     base.parent.mkdir(parents=True, exist_ok=True)
     x = np.asarray(samples)
@@ -105,8 +147,7 @@ def write_sigmf(
     try:
         raw.tofile(data_tmp)
         meta_tmp.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-        data_tmp.replace(data_path)
-        meta_tmp.replace(meta_path)
+        _replace_pair([(data_tmp, data_path), (meta_tmp, meta_path)])
     finally:
         data_tmp.unlink(missing_ok=True)
         meta_tmp.unlink(missing_ok=True)
