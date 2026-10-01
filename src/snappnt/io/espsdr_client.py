@@ -64,12 +64,16 @@ class EspSdrCapture:
 @dataclass
 class EspSdrClient:
     """Serial client. Pass ``serial_port`` (any object with write/readline/read/close) to
-    use an already opened port, for example a fake one in tests."""
+    use an already opened port, for example a fake one in tests. With ``sync_on_open`` (the
+    default) the constructor sends ``SYNC`` up to three times and waits for the echo, because
+    opening a UART bridge can reset the board and a command sent during boot is lost;
+    ``EspSdrTimeout`` is raised if the firmware never answers."""
 
     port: str = ""
     baudrate: int = 2_000_000
     timeout_s: float = 2.0
     serial_port: Any = None
+    sync_on_open: bool = True
     _rate_index: int | None = field(default=None, init=False, repr=False)
     _max_samples: int | None = field(default=None, init=False, repr=False)
     _frequency_hz: float | None = field(default=None, init=False, repr=False)
@@ -77,12 +81,26 @@ class EspSdrClient:
     def __post_init__(self) -> None:
         if self.serial_port is not None:
             self._ser = self.serial_port
+            self._sync_after_open()
             return
         try:
             import serial  # type: ignore[import-not-found]
         except ImportError as e:  # pragma: no cover - optional dependency
             raise ImportError('install the hardware extra: pip install -e ".[hw]"') from e
         self._ser = serial.Serial(self.port, self.baudrate, timeout=self.timeout_s)
+        self._sync_after_open()
+
+    def _sync_after_open(self) -> None:
+        if not self.sync_on_open:
+            return
+        for attempt in range(1, 4):
+            try:
+                self.resync(attempt)
+                return
+            except EspSdrTimeout:
+                if attempt == 3:
+                    self._ser.close()
+                    raise
 
     def _readline(self) -> str:
         raw = self._ser.readline()
@@ -149,7 +167,7 @@ class EspSdrClient:
         index = _rate_index(sample_rate_hz)
         reply = self._checked("LIMITS?", "LIMITS ")
         advertised = _parse_limits_rates(reply)
-        if int(sample_rate_hz) not in advertised:
+        if sample_rate_hz not in advertised:
             raise ValueError(
                 f"{sample_rate_hz} sps not supported by this chip; it offers {advertised}"
             )
@@ -207,12 +225,13 @@ class EspSdrClient:
 
     def resync(self, nonce: int = 1) -> None:
         """Find the end of stale bytes after an incomplete transfer: send ``SYNC <nonce>``
-        and read lines until the echo arrives."""
+        and read lines until a line ends with the echo. Stale binary bytes without a newline can
+        precede the echo on the same line, so the line is not compared as a whole."""
         if hasattr(self._ser, "reset_input_buffer"):
             self._ser.reset_input_buffer()
         self._ser.write(f"\nSYNC {int(nonce)}\n".encode("ascii"))
         for _ in range(70_000):
-            if self._readline() == f"SYNC {int(nonce)}":
+            if self._readline().endswith(f"SYNC {int(nonce)}"):
                 return
         raise EspSdrError("no SYNC echo")  # pragma: no cover - needs a stuck port
 
@@ -222,7 +241,7 @@ class EspSdrClient:
 
 def _rate_index(sample_rate_hz: float) -> int:
     try:
-        return RATE_INDEX_BY_SPS[int(sample_rate_hz)]
+        return RATE_INDEX_BY_SPS[sample_rate_hz]
     except KeyError:
         raise ValueError(
             f"{sample_rate_hz} sps is not an ESP-SDR rate; "

@@ -59,7 +59,7 @@ def data_reply(payload: bytes, n: int, crc: int | None = None) -> bytes:
 
 def client(*replies: bytes) -> tuple[EspSdrClient, FakePort]:
     port = FakePort(list(replies))
-    return EspSdrClient(serial_port=port), port
+    return EspSdrClient(serial_port=port, sync_on_open=False), port
 
 
 def test_unpack_payload_10bit_hand_values():
@@ -215,3 +215,48 @@ def test_save_capture_sigmf_roundtrip(tmp_path):
     assert g["core:sample_rate"] == 80e6 and g["core:datatype"] == "ci16_le"
     assert g["snappnt:espsdr_transfer_bits"] == 10
     assert meta["captures"][0]["core:frequency"] == 2412e6
+
+
+def test_resync_finds_echo_after_stale_bytes_on_the_same_line():
+    c, _ = client(b"\x01\x02\xffSYNC 7\n")
+    c.resync(7)
+
+
+def test_resync_ignores_longer_nonce():
+    c, _ = client(b"SYNC 17\n", b"SYNC 1\n")
+    c.resync(1)
+    assert c._ser.buf == b""
+
+
+def test_open_syncs_and_retries_after_lost_first_attempt():
+    port = FakePort([b"boot garbage with no newline"])  # attempt 1 gets no echo
+    port_replies = {"n": 0}
+    real_write = port.write
+
+    def write(data: bytes) -> int:
+        n = real_write(data)
+        port_replies["n"] += 1
+        if port_replies["n"] == 2:  # the board is up by the second attempt
+            port.buf += b"SYNC 2\n"
+        return n
+
+    port.write = write  # type: ignore[method-assign]
+    EspSdrClient(serial_port=port)
+    assert port.written == [b"\nSYNC 1\n", b"\nSYNC 2\n"]
+
+
+def test_open_raises_timeout_when_firmware_never_answers():
+    port = FakePort()
+    with pytest.raises(EspSdrTimeout):
+        EspSdrClient(serial_port=port)
+    assert len(port.written) == 3
+
+
+@pytest.mark.parametrize("rate", [80_000_000.5, 79_999_999.9])
+def test_fractional_rate_is_rejected(rate):
+    c, port = client(LIMITS_C3)
+    with pytest.raises(ValueError):
+        c.set_sample_rate(rate)
+    with pytest.raises(ValueError):
+        c.capture(256, rate)
+    assert port.written == []

@@ -52,7 +52,8 @@ a capture command; *word* is one 32-bit entry of the chip's capture memory.
   client side `web` `radio.js:14-29`).
 - Opening a UART bridge can reset the board, and a command sent during boot is lost. The
   browser client therefore sends a blank line plus `SYNC <time>` up to three times until it
-  sees its marker echoed (`web` `radio.js:14-29`).
+  sees its marker echoed (`web` `radio.js:14-29`). `EspSdrClient` does the same when it opens
+  a port (nonces 1, 2, 3), and accepts an echo that follows stale bytes on the same line.
 - Reply timeouts: the browser client allows 5 s for a header line and 5 s for the payload,
   with a 500 ms idle limit inside the payload (`web` `radio.js:12`, `:177`).
 
