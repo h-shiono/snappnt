@@ -1,0 +1,16 @@
+# ESP32-C61 at 4 MSa/s obtained by keeping every 20th sample of an 80 MSa/s stream, with the
+# analog band limited to 20 MHz and no digital filter.
+# Noise from the whole analog band folds into the 4 MHz output band (issue #3).
+name: navic_s_esp32c61_aliasing_none_b20
+signal: navic_s_sps
+seed: 3
+receiver:
+  device: esp32c61
+  sample_rate_hz: 4000000
+  n_samples: 16384
+  clock_offset_ppm: -8.0
+  generate_rate_hz: 80000000
+  analog_bandwidth_hz: 20000000
+  decimation: {factor: 20, method: none}
+satellites:
+  - {prn: 10, cn0_dbhz: 42, doppler_hz: 0, code_phase_chips: 55.0}

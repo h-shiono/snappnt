@@ -120,3 +120,11 @@ def test_loopback_with_decimation(method):
     res = acquire(x, scn.receiver.sample_rate_hz, spec, sat["prn"], freq_range_hz=(-40e3, 40e3))
     assert res.detected
     assert is_correct(res, sat, spec.code_length, code_tol_chips=0.5)
+
+
+def test_ideal_decimation_does_not_depend_on_wider_analog_bandwidth():
+    # Both analog bandwidths pass the whole 4 MHz output band, so the ideal output filter
+    # leaves the same samples.
+    x13, _ = generate(_noise_only("ideal", 13e6))
+    x20, _ = generate(_noise_only("ideal", 20e6))
+    assert np.allclose(x13, x20, atol=1e-5)
