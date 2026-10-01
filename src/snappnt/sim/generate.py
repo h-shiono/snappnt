@@ -12,8 +12,8 @@ With a frequency plan (external mixer) the carrier offset at baseband is
 (ppm as 1e-6): the receiver crystal error acts on the tuned frequency, the external LO error
 moves the IF in the opposite direction of the LO shift for a low-side LO and in the same
 direction for a high-side LO. The carrier Doppler rate is mirrored like the Doppler
-(``doppler_sign * doppler_rate_hzps``). Code Doppler and its rate keep the RF sign; the mixer
-does not change the code rate.
+(``doppler_sign * doppler_rate_hzps``). Code Doppler keeps the RF sign; the mixer
+does not change the code rate, and the chip rate is held constant over a snapshot.
 
 Optional band limiting and decimation: when the receiver sets ``generate_rate_hz``, signal and
 noise are created at that rate (noise density still 1 / generate rate), low-pass filtered to

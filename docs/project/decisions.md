@@ -147,7 +147,7 @@ an earlier one and says so.
   is applied to `lo_hz` and shifts the IF by −δ for a low-side LO and +δ for a high-side LO
   (δ = `lo_offset_ppm` · 1e-6 · `lo_hz`). The carrier Doppler rate is mirrored the same way (`doppler_sign * doppler_rate_hzps`; the
   truth keeps the RF value in `doppler_rate_hzps` and gives the value in the samples as
-  `expected_doppler_rate_hzps`). Code Doppler and its rate keep the RF sign. `lo_side` must be
+  `expected_doppler_rate_hzps`). Code Doppler keeps the RF sign, and the simulator holds the chip rate constant over a snapshot (the Doppler rate acts on the carrier phase only). `lo_side` must be
   `low` or `high`; anything else raises `ValueError`. `snappnt sim` writes
   `tuned_hz` as the SigMF centre frequency when a plan is present.
 - **Why:** IF = RF − LO (low side) or LO − RF (high side), so a shift of the LO moves the IF in
