@@ -10,8 +10,10 @@ this file only says how a single run proceeds.
 
 ## What this run does
 
-Do **exactly one step** for **one issue**, then stop. Find the issue in progress with
-`gh issue list --state open --label <status label>` and act on the first match, in this order:
+Do **exactly one step** for **one issue**, then stop. A step is the whole of one numbered
+item below, not one commit: pushing part of the work does not finish it. Find the issue in
+progress with `gh issue list --state open --label <status label>` and act on the first match,
+in this order:
 
 1. **`status:in-review`** — the issue has an open pull request from you
    (`Closes #<issue>` in its body). Decide what is open from the current state of the pull
@@ -45,6 +47,20 @@ Do **exactly one step** for **one issue**, then stop. Find the issue in progress
    address every requested change.
 
 If no issue has one of these labels, stop without changes.
+
+## How a run ends
+
+Every run that changes anything ends in exactly one of these ways, and nothing else:
+
+- `status:plan-approved`: the pull request is open and the label is `status:in-review`;
+- `status:ready`: the plan is posted and the label is `status:plan-proposed`;
+- `status:in-review`: every open item is answered, either by a fix (and a `Pushed:` comment
+  lists the push) or by a reasoned reply when no change is needed;
+- any step: a `Progress:` comment (see "Time limit"), or a report in the issue with
+  `status:blocked` (a stop condition, or the three-`Progress:` limit).
+
+Keep working until one of these holds. Ending the run any other way (for example after a
+commit and push with time left) leaves the issue with no event to start the next run.
 
 ## Time limit
 
