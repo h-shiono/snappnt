@@ -68,10 +68,12 @@ Loops are prevented by the workflows' start conditions instead:
   GitHub cancels a job at its time limit and anything the worker has not pushed is lost, so the
   worker is given its start time, pushes finished parts early, times long computations (such
   as detection-probability sweeps) on a small size before running them, and leaves a
-  `Progress:` comment when it cannot finish. That comment starts the orchestrator, which
-  answers with a comment telling the worker to continue; the next worker run continues from
-  the pushed branch. After three `Progress:` comments without a pull request, the issue is
-  escalated, since it is probably too large for one run.
+  `Progress:` comment when it cannot finish (on the issue while implementing, on the pull
+  request while fixing review findings). That comment starts the orchestrator, which answers
+  in the same place telling the worker to continue; the next worker run continues from the
+  pushed branch. The orchestrator escalates instead after three `Progress:` comments on an
+  issue without a pull request (probably too large for one run), or after three on a pull
+  request with no Greptile review in between (the fixes are not producing pushes).
 - The rulebook tells both agents to change nothing when nothing needs doing.
 
 ## Setup (maintainer)
