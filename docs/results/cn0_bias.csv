@@ -27,6 +27,8 @@ navic_s_ideal,4,code_phase,0.5 sample,0,200,-0.0798,0.0379,1.0000,0.0625,0.0000
 navic_s_ideal,4,code_phase,0.5 sample,1,200,-0.0798,0.0379,1.0000,0.0612,19.3791
 navic_s_ideal,4,sign_change,one flip in the middle,0,200,-0.1483,0.0354,1.0000,0.0000,0.0000
 navic_s_ideal,4,sign_change,one flip in the middle,1,200,-0.1483,0.0354,1.0000,0.0083,19.8013
+navic_s_ideal,4,sign_change,one flip inside a block,0,200,-1.4411,0.0439,1.0000,0.0000,0.0000
+navic_s_ideal,4,sign_change,one flip inside a block,1,200,-1.4411,0.0439,1.0000,0.0098,36.4182
 navic_s_ideal,4,quantisation,10 bit,0,200,-0.0908,0.0380,1.0000,0.0000,0.0000
 navic_s_ideal,4,quantisation,10 bit,1,200,-0.0908,0.0380,1.0000,0.0081,19.4560
 navic_s_ideal,4,all,"0.5 step, 0.5 sample, flip, 10 bit",0,200,-0.8921,0.0386,1.0000,0.0625,250.0000

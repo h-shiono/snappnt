@@ -85,7 +85,8 @@ row.
 | Frequency-bin offset | 0.5 step | −0.81 ± 0.04 | −0.72 |
 | Code-phase sampling | 0.25 sample | −0.08 ± 0.04 | +0.01 |
 | Code-phase sampling | 0.5 sample | −0.08 ± 0.04 | +0.01 |
-| Data-bit sign change | one flip in the middle | −0.15 ± 0.04 | −0.06 |
+| Data-bit sign change | one flip in the middle (at 2 ms, a block boundary) | −0.15 ± 0.04 | −0.06 |
+| Data-bit sign change | one flip inside a block (at 1.5 ms) | −1.44 ± 0.04 | −1.35 |
 | Quantisation | 10 bit | −0.09 ± 0.04 | 0.00 |
 | All together | 0.5 step, 0.5 sample, flip, 10 bit | −0.89 ± 0.04 | −0.80 |
 
@@ -107,8 +108,13 @@ Data file (all rows, with and without interpolation): [cn0_bias.csv](cn0_bias.cs
 ### Findings
 
 - **A sign change inside a single block is the largest cause**, about −3.3 dB at both
-  conditions. With the ideal condition cut into four 1 ms blocks, the same sign change costs
-  only −0.06 dB, because a block that contains the edge is one of four added in power. The
+  conditions. With the ideal condition cut into four 1 ms blocks, a flip in the middle of the
+  snapshot falls at 2 ms, exactly on a block boundary. No block contains the edge, so every
+  block is coherent and the cost is only −0.06 dB. A flip at 1.5 ms lies inside the second
+  block: that block loses part of its peak (not measured separately), the other three do not, and the cost is −1.35 dB
+  (this case is not at a code-period edge, so it checks the mechanism and is not a navigation
+  data case). Cutting into blocks therefore limits the loss to the block that holds the edge;
+  it removes the loss only when the edge falls on a boundary. The
   4 dB bias of the initial skeleton at 45 dB-Hz (41.0 dB-Hz estimated) is of the size of the
   sign-change case with one block (−3.4 dB). This explanation was not tested on the original
   skeleton run.

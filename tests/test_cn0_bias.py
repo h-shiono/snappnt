@@ -88,6 +88,7 @@ class Case:
     freq_frac: float = 0.0  # frequency offset from a bin centre, in grid steps
     code_frac: float = 0.0  # code phase offset from a sample, in samples
     flip: bool = False
+    flip_at: float | None = None  # edge position as a fraction of the snapshot; None: a code edge
     quantise: bool = False
 
 
@@ -96,6 +97,10 @@ def cases_for(name: str, n_blocks: int) -> list[Case]:
     out += [Case("frequency", f"{f} step", freq_frac=f) for f in (0.25, 0.5)]
     out += [Case("code_phase", f"{f} sample", code_frac=f) for f in (0.25, 0.5)]
     out += [Case("sign_change", "one flip in the middle", flip=True)]
+    if n_blocks > 1:
+        # Edge inside a block (not on a block boundary), at 1.5 blocks of four. Not at a code
+        # edge, so it is a check of the mechanism and not a navigation-data case.
+        out += [Case("sign_change", "one flip inside a block", flip=True, flip_at=0.375)]
     if CONDITIONS[name]["quantization_bits"] is not None:
         out += [Case("quantisation", "10 bit", quantise=True)]
     out += [Case("all", "0.5 step, 0.5 sample, flip, 10 bit", 0.5, 0.5, True, True)]
@@ -140,6 +145,8 @@ def make_snapshot(name: str, case: Case, cn0_dbhz: float, seed: int, n_blocks: i
         first_edge = round((spec.code_length - sat.code_phase_chips) / chips_per_sample)
         edges = first_edge % period + period * np.arange(-1, n // period + 2)
         edge = int(edges[np.argmin(np.abs(edges - n / 2))])
+        if case.flip_at is not None:
+            edge = round(case.flip_at * n)
         signal = x - noise
         signal[edge:] *= -1.0
         x = (noise + signal).astype(np.complex64)
@@ -271,15 +278,17 @@ def test_results_csv_has_one_row_per_cause_and_condition():
     with CSV_PATH.open(newline="") as f:
         rows = list(csv.DictReader(f))
     assert list(rows[0]) == CSV_COLUMNS
-    for name, cond in CONDITIONS.items():
-        for n_blocks in cond["n_blocks"]:
-            expected = {(c.cause, c.setting) for c in cases_for(name, n_blocks)}
-            found = {
-                (r["cause"], r["setting"])
-                for r in rows
-                if r["condition"] == name and r["n_blocks"] == str(n_blocks)
-            }
-            assert found == expected, (name, n_blocks)
+    expected = [
+        (name, str(n_blocks), c.cause, c.setting, str(refine))
+        for name, cond in CONDITIONS.items()
+        for n_blocks in cond["n_blocks"]
+        for c in cases_for(name, n_blocks)
+        for refine in (0, 1)
+    ]
+    found = [(r["condition"], r["n_blocks"], r["cause"], r["setting"], r["refine"]) for r in rows]
+    # No row missing, none duplicated, none extra, for both values of refine.
+    assert sorted(found) == sorted(expected)
+    assert {r["trials"] for r in rows} == {"200"}
     assert {r["cause"] for r in rows} == set(CAUSES)
 
 
@@ -310,7 +319,7 @@ def baseline_versus_cn0(n_trials: int = 100) -> None:
                 print(name, cn0, r, flush=True)
 
 
-def main(n_trials: int = 50, only: str | None = None) -> None:
+def main(n_trials: int = 200, only: str | None = None) -> None:
     CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
     existing = []
     if CSV_PATH.exists() and only is not None:
@@ -358,4 +367,4 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["baseline_versus_cn0"]:
         baseline_versus_cn0()
         sys.exit(0)
-    main(int(sys.argv[1]) if len(sys.argv) > 1 else 50, sys.argv[2] if len(sys.argv) > 2 else None)
+    main(int(sys.argv[1]) if len(sys.argv) > 1 else 200, sys.argv[2] if len(sys.argv) > 2 else None)
