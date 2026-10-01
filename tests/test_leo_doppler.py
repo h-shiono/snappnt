@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from snappnt.rx.acquisition import acquire, detection_threshold
+from snappnt.rx.acquisition import _rate_grid, acquire, detection_threshold
 from snappnt.signals import load_signal
 from snappnt.sim import generate, load_scenario
 from snappnt.sim.leo import leo_pass_doppler, rate_mismatch_loss_db
@@ -121,7 +121,8 @@ def test_rate_search_recovers_rate_where_zero_rate_loses_power():
     # The power is flat near the true rate (the loss at one step is below 0.01 dB), so noise can
     # move the peak by a step; two steps is the tolerance.
     assert abs(found.doppler_rate_hzps - truth) <= 2 * found.rate_step_hzps
-    assert found.rate_step_hzps == pytest.approx(0.25 / found.coherent_time_s**2)
+    # The spacing is even, covers the range exactly and is not coarser than the default step.
+    assert 0.0 < found.rate_step_hzps <= 0.25 / found.coherent_time_s**2
     assert found.metric > 2.0 * zero.metric
 
 
@@ -138,3 +139,33 @@ def test_rate_search_counts_rate_hypotheses_in_false_alarm_threshold():
     assert many.n_cells == 3 * one.n_cells
     assert many.threshold == pytest.approx(detection_threshold(many.n_cells, 1, 1e-3))
     assert many.threshold > one.threshold
+
+
+@pytest.mark.parametrize("width", [600.0, 601.0, 37.5, 10.0, 0.0])
+def test_rate_grid_stays_inside_range_and_includes_both_ends(width):
+    lo = -1900.0
+    rates, step = _rate_grid((lo, lo + width), 39.0, 0.01, 1)
+    assert rates[0] == lo
+    assert rates[-1] == pytest.approx(lo + width)
+    assert rates.min() >= lo and rates.max() <= lo + width
+    assert step <= 39.0
+    if rates.size > 1:
+        assert np.diff(rates) == pytest.approx(step)
+
+
+def test_rate_grid_default_step_follows_snapshot_length_with_blocks():
+    t_coh = 0.005
+    _, one = _rate_grid((0.0, 1e5), None, t_coh, 1)
+    _, sixteen = _rate_grid((0.0, 1e5), None, t_coh, 16)
+    assert one <= 0.25 / t_coh**2
+    assert sixteen <= 0.5 / (t_coh * 16 * t_coh)
+    assert sixteen < one
+
+
+@pytest.mark.parametrize(
+    "rate_range, step",
+    [((1.0, -1.0), 10.0), ((0.0, 100.0), 0.0), ((0.0, 100.0), -5.0), ((0.0, float("nan")), None)],
+)
+def test_rate_grid_rejects_invalid_input(rate_range, step):
+    with pytest.raises(ValueError, match="rate_"):
+        _rate_grid(rate_range, step, 0.01, 1)
