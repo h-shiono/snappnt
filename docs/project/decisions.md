@@ -158,3 +158,36 @@ an earlier one and says so.
   describe a receiver tuned to the RF, which is not the case behind a mixer. `tuned_hz` equal
   to the IF in the C-band scenarios is an assumption until a real receiver setup is chosen.
 
+## D-014 SigMF pair replacement uses backup and restore (2026-10-01)
+
+- **Decision:** `write_sigmf` writes both files under `.tmp` names. If a recording with the same
+  base name exists, it moves its two files to `.bak` names, renames the new files into place,
+  and deletes the backups only after both renames have succeeded. If any step fails, it removes
+  the files it placed, moves the backups back and removes the temporary files, so the old
+  recording stays complete and readable. If moving a backup back fails too, the `.bak` files are
+  kept and the raised error names them, so the old recording can be recovered by hand. This is
+  the only case in which a temporary or backup file remains. SigMF keys and file formats do not
+  change.
+- **Details of the rollback:** Each cleanup step is tried even if an earlier one failed. If a
+  placed new file cannot be removed, no backup is moved back, because a restored old file next
+  to a new one would read as a pair of different recordings; all backups are kept and named in
+  the error together with the new files that could not be removed (this also applies to a first
+  write, where there are no backups and a partial recording stays at the final path). If only some backups cannot be moved back, the old files that were restored are
+  never next to a new file, so at worst the recording is incomplete and does not read. Before
+  anything is moved, `write_sigmf` refuses with `FileExistsError` when a `.bak` file already
+  exists, as a file or a dangling symbolic link, so kept backups are never overwritten. If every rename succeeded and only deleting a
+  backup fails, the write counts as successful and a log warning (the `logging` module, so that warnings
+  turned into errors cannot make a finished write look failed) names the backup; the next write to
+  the same base name refuses until that backup is deleted.
+- **Known limit:** While an existing recording is replaced, its two final paths are missing
+  for a short time (between moving them to `.bak` and placing the new files). A reader in
+  another process can fail with `FileNotFoundError` in that window. Before this change both
+  paths were always present, but a failed second rename could leave a mismatched pair. A
+  single-writer tool such as snappnt does not need concurrent reads; this is accepted.
+- **Why:** Two renames cannot be made atomic together. Before this change, a failure of the
+  second rename left the new samples next to the old metadata, a pair that reads without error
+  but describes the wrong samples.
+- **Alternatives:** Renaming the metadata first leaves the old samples paired with the new
+  metadata when the data rename fails, which is the same mismatch in the other direction.
+  Refusing `--overwrite` when the metadata file cannot be replaced is a check made in advance,
+  and it does not cover a failure between the two renames.
