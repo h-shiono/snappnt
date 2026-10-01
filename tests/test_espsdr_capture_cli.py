@@ -255,3 +255,22 @@ def test_write_error_is_reported_and_leaves_no_partial_files(
     assert run("PORT", "-n", "256", "-o", str(tmp_path / "cap")) == 1
     assert not any(tmp_path.iterdir())
     assert "cannot write capture 1 of 1: disk full" in capsys.readouterr().err
+
+
+def test_failed_overwrite_keeps_the_old_recording(fake_port, tmp_path, monkeypatch):
+    from snappnt.io import sigmf_io
+
+    old_meta = '{"old": true}'
+    (tmp_path / "cap.sigmf-data").write_bytes(b"old")
+    (tmp_path / "cap.sigmf-meta").write_text(old_meta)
+
+    def fail(self, *a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(sigmf_io.Path, "write_text", fail)
+    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, data_reply(ZERO_BODY, 256), b"OK\n")
+    assert run("PORT", "-n", "256", "--overwrite", "-o", str(tmp_path / "cap")) == 1
+    monkeypatch.undo()
+    assert (tmp_path / "cap.sigmf-data").read_bytes() == b"old"
+    assert (tmp_path / "cap.sigmf-meta").read_text() == old_meta
+    assert sorted(f.name for f in tmp_path.iterdir()) == ["cap.sigmf-data", "cap.sigmf-meta"]

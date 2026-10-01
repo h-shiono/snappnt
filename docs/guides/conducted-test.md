@@ -80,7 +80,9 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
   depth. The maximum gain index, the rates a particular chip offers and the maximum samples per
   capture are reported by the board (`LIMITS?`, `INFO`), so only a live run checks them. A file
   that cannot be written (for example a full disk) ends the run with exit code 1, naming the
-  capture, and removes that capture's partial files.
+  capture. Each recording is written under temporary names and renamed only when both files
+  are complete, so a failed write leaves no partial files and an existing recording that
+  `--overwrite` was meant to replace stays intact.
 - With `--count N` greater than 1 each capture is its own recording, `run1_0000`, `run1_0001`,
   and so on (decision D-011). Captures already written stay if a later one fails; a damaged
   capture (wrong CRC-32) ends the run with exit code 1 after the port is resynchronised.

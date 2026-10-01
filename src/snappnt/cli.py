@@ -232,8 +232,6 @@ def cmd_capture(a: argparse.Namespace) -> int:
                     description="snappnt capture",
                 )
             except OSError as e:
-                for f in existing_outputs([path]):
-                    f.unlink(missing_ok=True)
                 print(f"error: cannot write capture {done + 1} of {a.count}: {e}", file=sys.stderr)
                 return 1
             done += 1
