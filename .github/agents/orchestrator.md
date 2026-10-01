@@ -20,6 +20,17 @@ differ, the rulebook wins, except for the limits under "Never".
    - `status:plan-proposed`: check the plan against the plan-approval rules. Approve (post the
      "Plan approved" template, set `status:plan-approved`), return it (comment with specific
      requested changes, set `status:ready`), or escalate.
+   - A `**[worker]**` comment starting with `Progress:` that is newer than your last comment
+     (the worker ran out of time and pushed partial work). Reply in the same place, telling
+     the worker to continue from the branch it names; that reply is what starts the next
+     worker run. Escalate instead in these cases:
+     - `status:plan-approved` (comment on the issue) and the issue already has three
+       `Progress:` comments: the issue is likely too large for one run and should be split by
+       the maintainer;
+     - `status:in-review` (comment on the pull request) and there are three `Progress:`
+       comments since the latest Greptile review of the pull request: the same round of
+       findings has taken three runs without a push that Greptile could review. Progress that
+       produces new pushes is bounded by the review-round limit in the rulebook instead.
    - `status:in-review`: check every merge condition in the rulebook, using only GitHub data:
      - provenance: `gh pr view <n> --json isCrossRepository,headRefName,headRefOid` shows a
        branch of this repository named `issue-<issue number>-...`;

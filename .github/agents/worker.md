@@ -14,22 +14,63 @@ Do **exactly one step** for **one issue**, then stop. Find the issue in progress
 `gh issue list --state open --label <status label>` and act on the first match, in this order:
 
 1. **`status:in-review`** — the issue has an open pull request from you
-   (`Closes #<issue>` in its body). Read the pull request: CI results, Greptile review
-   comments, comments tagged `**[orchestrator]**`, and untagged comments from the maintainer
-   (see below) that are newer than your last `**[worker]**` comment. For each finding, either
-   fix it or reply in its thread with the reason it is not a problem, citing code, a test or a document.
-   Commit the fixes on the same branch and push. If there is nothing new since your last
-   comment, stop without changes.
+   (`Closes #<issue>` in its body). Decide what is open from the current state of the pull
+   request, not from comment times (a review can arrive while you work):
+   - each unresolved review thread (Greptile, `**[orchestrator]**` or the maintainer, see
+     below) whose last comment is not yours;
+   - each pull request comment tagged `**[orchestrator]**` or untagged from the maintainer
+     that no later `**[worker]**` comment answers by linking to it;
+   - failing CI on the head commit;
+   - the items left in your latest `Progress:` comment (see "Time limit"), unless a later
+     `Pushed:` comment from you says that `Progress:` comment is done.
+
+   Commit the fixes on the same branch and push. Then answer every open thread in the thread
+   itself: "Fixed in <commit>" with what changed, or the reason it is not a problem, citing
+   code, a test or a document. A thread you answered is no longer open, so a later run does
+   not repeat it. Answer each open conversation comment with a comment that links to it.
+   After every push, also post a pull request comment starting with `**[worker]**`, a blank
+   line, then `Pushed:` with the commit, what it fixed (linking each thread or comment), and,
+   if it finishes a `Progress:` comment, that this `Progress:` comment is done. If nothing is
+   open, stop without changes.
 2. **`status:plan-approved`** — implement the approved plan on a branch named
-   `issue-<number>-<short-description>`. Run all checks listed in `CLAUDE.md`. Push the branch
-   and open a pull request with `gh pr create`, following `.github/pull_request_template.md`,
-   with `Closes #<number>`. Then replace the label with `status:in-review`.
+   `issue-<number>-<short-description>`. If such a branch already exists on `origin` (an
+   earlier run was stopped), check it out and continue from it instead of starting over; your
+   latest `Progress:` comment on the issue (see "Time limit") says what is left. Run all checks listed
+   in `CLAUDE.md`. Push the branch and open a pull request with `gh pr create`, following
+   `.github/pull_request_template.md`, with `Closes #<number>`. Then replace the label with
+   `status:in-review`.
 3. **`status:ready`** — post a plan as an issue comment (files to change, tests to add, how
    each acceptance criterion will be checked, open questions), then replace the label with
    `status:plan-proposed`. If a comment tagged `**[orchestrator]**` returned an earlier plan,
    address every requested change.
 
 If no issue has one of these labels, stop without changes.
+
+## Time limit
+
+GitHub stops the job 120 minutes after the start time given in the prompt, and anything not
+pushed by then is lost. Check the time with `date -u` before each long step.
+
+- Commit and push the branch as soon as a part of the work is complete and its tests pass
+  (for example the code and tests, before running result sweeps). Never leave more than about
+  30 minutes of work unpushed.
+- Before a long computation (a detection-probability sweep, many trials, a large simulation),
+  run a small version first, time it, and plan it so that this run ends at least 30 minutes
+  before the limit. Run it under `timeout` with that budget.
+- Never reduce a size that the issue or the approved plan states (number of trials, C/N0
+  grid, cases): a smaller run does not meet the acceptance criterion. If the full computation
+  does not fit in one run, split it into parts (for example one case or a range of C/N0 per
+  part), write each finished part's results to a file on the branch, push, and leave the rest
+  for the next run. Only a size that neither the issue nor the plan states may be chosen to
+  fit; say on the result page and in the pull request which size was used and why.
+- If the remaining work cannot finish before the limit, push what is done and post a comment
+  starting with `**[worker]**`, a blank line, then `Progress:` followed by what is done, what
+  is left and the branch name. Post it as the last comment of the run, after any `Pushed:`
+  comment. Post it on the issue while implementing the plan, and on the
+  pull request while fixing review findings. Keep the label. The orchestrator replies in the
+  same place, and that reply starts the next run, which continues from the branch.
+- While implementing the plan: if the issue already has three `Progress:` comments from you,
+  do not continue: report it in the issue and set `status:blocked`.
 
 ## Rules for this run
 

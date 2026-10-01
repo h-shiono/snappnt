@@ -64,7 +64,16 @@ Loops are prevented by the workflows' start conditions instead:
 - Each role has its own concurrency group, so at most one worker and one orchestrator run at a
   time. Extra events wait; GitHub keeps only the newest waiting run per group, which is enough
   because every run re-reads the current state.
-- Runs are capped: worker 80 turns and 60 minutes, orchestrator 40 turns and 30 minutes.
+- Runs are capped: worker 120 turns and 120 minutes, orchestrator 40 turns and 30 minutes.
+  GitHub cancels a job at its time limit and anything the worker has not pushed is lost, so the
+  worker is given its start time, pushes finished parts early, times long computations (such
+  as detection-probability sweeps) on a small size before running them, and leaves a
+  `Progress:` comment when it cannot finish (on the issue while implementing, on the pull
+  request while fixing review findings). That comment starts the orchestrator, which answers
+  in the same place telling the worker to continue; the next worker run continues from the
+  pushed branch. The orchestrator escalates instead after three `Progress:` comments on an
+  issue without a pull request (probably too large for one run), or after three on a pull
+  request with no Greptile review in between (the fixes are not producing pushes).
 - The rulebook tells both agents to change nothing when nothing needs doing.
 
 ## Setup (maintainer)
@@ -93,7 +102,8 @@ progress finish; no new run starts. Nothing else needs to change.
 
 - **GitHub Actions minutes.** Private repositories on GitHub Pro include 3,000 minutes per
   month. Most event-triggered runs that find nothing to do finish in a few minutes; runs that
-  implement an issue can take up to the 60-minute limit.
+  implement an issue can take up to the 120-minute limit, and an issue that needs several
+  runs (see the `Progress:` comments above) uses that much per run.
 - **Claude usage.** Runs consume the usage of the plan behind `CLAUDE_CODE_OAUTH_TOKEN`,
   shared with any other use of that plan.
 - **Scheduled workflows** run from the default branch only.
