@@ -33,12 +33,16 @@ Doppler-rate search (parameter accepted, applied as a fixed hypothesis).
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import numpy as np
+from scipy import fft as sp_fft
 from scipy import stats
 
 from snappnt.signals import SignalSpec, get_code
+
+_WORKERS = os.cpu_count() or 1
 
 
 @dataclass(frozen=True)
@@ -77,6 +81,60 @@ def parabolic_offset(y_minus: float, y_zero: float, y_plus: float) -> float:
     return float(np.clip(0.5 * (y_minus - y_plus) / denom, -0.5, 0.5))
 
 
+# Working-memory budget for one batch, in bytes per temporary array. The number of frequency
+# bins per batch is chosen so that each temporary array (float64 cycles, complex64 wipe-off,
+# the FFT buffers) holds about this many bytes, whatever the snapshot length.
+_BATCH_BYTES = 32 * 2**20
+_MAX_CHUNK_BINS = 64
+
+
+def _power_grid(
+    x: np.ndarray,
+    fs: float,
+    carriers_hz: np.ndarray,
+    doppler_rate_hzps: float,
+    rep_f: list[np.ndarray],
+    block: int,
+    n_blocks: int,
+    nfft: int,
+    k: int,
+) -> np.ndarray:
+    """Non-coherent power of the correlation for every (carrier frequency, lag) cell.
+
+    The frequency bins are processed in batches with one 2-D FFT call per block. The carrier
+    wipe-off is built one block at a time, and the batch size is chosen from the FFT length, so
+    the working memory is about ``_BATCH_BYTES`` per temporary array and does not grow with the
+    snapshot length. The carrier phase is computed in float64 and reduced to one cycle before
+    it is cast to single precision, so the phase stays accurate for long snapshots.
+    """
+    t = np.arange(n_blocks * block) / fs
+    quad_cycles = 0.5 * doppler_rate_hzps * t**2
+    power = np.zeros((carriers_hz.size, k), dtype=np.float32)
+    chunk_bins = int(np.clip(_BATCH_BYTES // (8 * max(nfft, block)), 1, _MAX_CHUNK_BINS))
+    for lo in range(0, carriers_hz.size, chunk_bins):
+        sel = carriers_hz[lo : lo + chunk_bins]
+        acc = power[lo : lo + sel.size]
+        for b in range(n_blocks):
+            seg = slice(b * block, (b + 1) * block)
+            cycles = np.outer(sel, t[seg])
+            cycles += quad_cycles[seg]
+            cycles -= np.floor(cycles)
+            phase = (cycles * (-2.0 * np.pi)).astype(np.float32)
+            del cycles
+            yb = np.empty(phase.shape, dtype=np.complex64)
+            yb.real = np.cos(phase)
+            yb.imag = np.sin(phase)
+            del phase
+            yb *= x[seg]
+            yb_f = sp_fft.fft(yb, nfft, axis=-1, workers=_WORKERS)
+            del yb
+            yb_f = np.conj(yb_f)
+            yb_f *= rep_f[b]
+            corr = sp_fft.ifft(yb_f, axis=-1, workers=_WORKERS)[:, :k]
+            acc += corr.real**2 + corr.imag**2
+    return power
+
+
 def acquire(
     x: np.ndarray,
     fs: float,
@@ -112,17 +170,14 @@ def acquire(
     rep = _replica(code, spec.chip_rate_hz, fs, n + k)
     # Each block only needs the replica segment it can overlap: [start, start + block + k).
     nfft = 1 << int(np.ceil(np.log2(2 * block + k)))
-    rep_f = [np.fft.fft(rep[b * block : b * block + block + k], nfft) for b in range(n_blocks)]
+    rep_f = [
+        sp_fft.fft(rep[b * block : b * block + block + k], nfft).astype(np.complex64)
+        for b in range(n_blocks)
+    ]
 
-    t = np.arange(n) / fs
-    power = np.zeros((freqs.size, k), dtype=np.float64)
-    for i, f in enumerate(freqs):
-        wipe = np.exp(-2j * np.pi * ((center_offset_hz + f) * t + 0.5 * doppler_rate_hzps * t**2))
-        y = (x * wipe).astype(np.complex64)
-        for b in range(n_blocks):
-            yb_f = np.fft.fft(y[b * block : (b + 1) * block], nfft)
-            corr = np.fft.ifft(rep_f[b] * np.conj(yb_f))[:k]
-            power[i] += np.abs(corr) ** 2
+    power = _power_grid(
+        x, fs, freqs + center_offset_hz, doppler_rate_hzps, rep_f, block, n_blocks, nfft, k
+    )
 
     # Noise level: mean power away from the peak (exclude +/-1 chip and +/-1 frequency bin).
     fi, ki = np.unravel_index(np.argmax(power), power.shape)
