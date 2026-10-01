@@ -96,9 +96,13 @@ of at most the requested step. A reversed range or a step that is not positive r
 share one frequency bin, and a rate error also moves the carrier by up to half of
 (error × snapshot length) either side of the middle of the snapshot; the default step is then
 the smaller of 1 / (4·T²) and 1 / (2·T·T_snapshot), which keeps that movement below a quarter
-of a bin width at the edge of a step. For one block only the first term applies. At a rate error of half that step the formula gives a loss of
-0.004 dB for every T, so the default is finer than needed; a step of 1 / T² would still
+of a bin width at the edge of a step. For one block only the first term applies.
+
+For one block (`n_blocks` = 1), at a rate error of half the default step the formula gives a
+loss of 0.004 dB for every T, so the default is finer than needed; a step of 1 / T² would still
 leave a loss of only about 0.06 dB at the edge of a step (from the formula, not simulated).
+These figures are single-block results. They do not apply to `n_blocks` > 1, where a rate error
+also moves the carrier between blocks; the loss of a multi-block rate search was not evaluated.
 
 Example (`tests/test_leo_doppler.py`): 80 ms snapshot, C/N0 34 dB-Hz, true rate −1572 Hz/s,
 frequency range ±80 Hz around the Doppler. With rate zero the peak metric is 40 against a
