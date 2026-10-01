@@ -171,11 +171,13 @@ an earlier one and says so.
 - **Details of the rollback:** Each cleanup step is tried even if an earlier one failed. If a
   placed new file cannot be removed, no backup is moved back, because a restored old file next
   to a new one would read as a pair of different recordings; all backups are kept and named in
-  the error. If only some backups cannot be moved back, the old files that were restored are
+  the error together with the new files that could not be removed (this also applies to a first
+  write, where there are no backups and a partial recording stays at the final path). If only some backups cannot be moved back, the old files that were restored are
   never next to a new file, so at worst the recording is incomplete and does not read. Before
   anything is moved, `write_sigmf` refuses with `FileExistsError` when a `.bak` file already
-  exists, so kept backups are never overwritten. If every rename succeeded and only deleting a
-  backup fails, the write counts as successful and a warning names the backup; the next write to
+  exists, as a file or a dangling symbolic link, so kept backups are never overwritten. If every rename succeeded and only deleting a
+  backup fails, the write counts as successful and a log warning (the `logging` module, so that warnings
+  turned into errors cannot make a finished write look failed) names the backup; the next write to
   the same base name refuses until that backup is deleted.
 - **Known limit:** While an existing recording is replaced, its two final paths are missing
   for a short time (between moving them to `.bak` and placing the new files). A reader in

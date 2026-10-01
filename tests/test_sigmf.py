@@ -165,9 +165,11 @@ def test_existing_backup_is_never_overwritten(tmp_path):
     assert (tmp_path / "x.sigmf-meta.bak").read_text(encoding="utf-8") == "saved"
 
 
-def test_failed_backup_delete_warns_but_write_succeeds(tmp_path, monkeypatch):
+def test_failed_backup_delete_logs_but_write_succeeds(tmp_path, monkeypatch, caplog):
+    import re
+    import warnings
+
     import numpy as np
-    import pytest
 
     from snappnt.io import sigmf_io
 
@@ -181,7 +183,45 @@ def test_failed_backup_delete_warns_but_write_succeeds(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sigmf_io.Path, "unlink", unlink)
     new = np.ones(4, np.complex64)
-    with pytest.warns(UserWarning, match=r"could not delete .*\.bak"):
+    with warnings.catch_warnings(), caplog.at_level("WARNING", logger=sigmf_io.__name__):
+        warnings.simplefilter("error")  # warnings as errors must not fail a finished write
         sigmf_io.write_sigmf(tmp_path / "x", new, 2e6)
     monkeypatch.undo()
     assert np.array_equal(sigmf_io.read_sigmf(tmp_path / "x")[0], new)
+    # Both backups are tried, and each failure is reported.
+    assert len(re.findall(r"could not delete .*\.bak", caplog.text)) == 2
+
+
+def test_unremovable_file_after_first_write_failure_is_named(tmp_path, monkeypatch):
+    import numpy as np
+    import pytest
+
+    from snappnt.io import sigmf_io
+
+    _fail_nth_replace(monkeypatch, 2)
+    real = sigmf_io.Path.unlink
+
+    def unlink(self, missing_ok=False):
+        if self.name.endswith(".tmp"):
+            return real(self, missing_ok=missing_ok)
+        raise OSError("cannot remove")
+
+    monkeypatch.setattr(sigmf_io.Path, "unlink", unlink)
+    with pytest.raises(OSError, match=r"could not be removed: .*x\.sigmf-data"):
+        sigmf_io.write_sigmf(tmp_path / "x", np.ones(4, np.complex64), 2e6)
+
+
+def test_dangling_backup_link_is_not_overwritten(tmp_path):
+    import numpy as np
+    import pytest
+
+    from snappnt.io import sigmf_io
+
+    _old_recording(tmp_path)
+    link = tmp_path / "x.sigmf-meta.bak"
+    link.symlink_to(tmp_path / "missing")
+    before = sorted(p.name for p in tmp_path.iterdir())
+    with pytest.raises(FileExistsError, match=r"x\.sigmf-meta\.bak"):
+        sigmf_io.write_sigmf(tmp_path / "x", np.ones(4, np.complex64), 2e6)
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+    assert link.is_symlink()

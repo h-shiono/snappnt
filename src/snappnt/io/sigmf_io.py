@@ -8,13 +8,16 @@ namespace, declared in ``core:extensions`` as SigMF requires.
 from __future__ import annotations
 
 import json
-import warnings
+import logging
+import os
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from snappnt import __version__
+
+log = logging.getLogger(__name__)
 
 SIGMF_VERSION = "1.2.0"
 _DTYPES = {
@@ -46,12 +49,15 @@ def _replace_pair(pairs: list[tuple[Path, Path]]) -> None:
     recording stays complete. Each cleanup step is tried even if an earlier one failed. If a
     placed file cannot be removed, no backup is moved back (a restored old file next to a new
     one would be a readable pair of different recordings); the backups are kept instead. Backups
-    that could not be moved back are kept in any case, and the raised error names them.
+    that could not be moved back are kept in any case. The raised error names the new files
+    that could not be removed and the backups that are kept.
 
     The backups are deleted after every rename has succeeded. A backup that cannot be deleted
-    does not make the write fail: the new files are complete, so a warning names the backup."""
+    does not make the write fail: the new files are complete, so a log warning
+    names the backup (a logging call, so that warnings turned into errors cannot make the write
+    look failed)."""
     taken = [f.with_name(f.name + ".bak") for _, f in pairs]
-    taken = [b for b in taken if b.exists()]
+    taken = [b for b in taken if os.path.lexists(b)]
     if taken:
         names = ", ".join(str(b) for b in taken)
         raise FileExistsError(
@@ -70,32 +76,37 @@ def _replace_pair(pairs: list[tuple[Path, Path]]) -> None:
             tmp.replace(final)
             placed.append(final)
     except OSError:
-        kept: list[Path] = []
+        stuck: list[Path] = []
         for final in placed:
             try:
                 final.unlink(missing_ok=True)
             except OSError:
-                kept.extend(backups.values())
-                break
-        if not kept:
+                stuck.append(final)
+        kept: list[Path] = []
+        if stuck:
+            kept.extend(backups.values())
+        else:
             for final, backup in backups.items():
                 try:
                     backup.replace(final)
                 except OSError:
                     kept.append(backup)
-        if kept:
-            names = ", ".join(str(b) for b in kept)
-            raise OSError(
-                f"could not restore the previous recording; its files are kept as {names}"
-            ) from None
+        if stuck or kept:
+            msg = "could not restore the previous recording"
+            if stuck:
+                msg += f"; new files that could not be removed: {', '.join(map(str, stuck))}"
+            if kept:
+                msg += f"; its files are kept as {', '.join(map(str, kept))}"
+            raise OSError(msg) from None
         raise
+    stale: list[tuple[Path, OSError]] = []
     for backup in backups.values():
         try:
             backup.unlink(missing_ok=True)
         except OSError as e:
-            warnings.warn(
-                f"new recording written, but could not delete {backup}: {e}", stacklevel=2
-            )
+            stale.append((backup, e))
+    for backup, e in stale:
+        log.warning("new recording written, but could not delete %s: %s", backup, e)
 
 
 def write_sigmf(
@@ -122,7 +133,7 @@ def write_sigmf(
     raised error names them. While the rename runs, the final paths of an existing recording are
     briefly missing, so a reader in another process can fail with ``FileNotFoundError``. A
     ``.bak`` file left by an earlier failed write makes this function raise ``FileExistsError``
-    before changing anything. If only deleting a backup fails, the write succeeds and a warning
+    before changing anything. If only deleting a backup fails, the write succeeds and a log warning
     names the backup."""
     base = _base(path)
     base.parent.mkdir(parents=True, exist_ok=True)
