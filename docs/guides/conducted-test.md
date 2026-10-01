@@ -32,6 +32,46 @@ B210-class USRP (TX) ─ 30 dB ─ splitter ─┬─ 30 dB ─ DC block ─ XIA
   or tuning).
 - The attenuator values are a starting point. Begin with 60–70 dB in total.
 
+## Input level and C/N0 calculator
+
+`snappnt link-budget` adds up the losses between the generator and each receiver, and gives the
+input level in dBm. It takes no default for the generator power, the losses or the ESP32 noise
+figure, so each run states them; a path with no loss at all is given as `--loss 0`, and the
+command refuses to run when a receiver's path has no loss option.
+`--gen-dbm` is the power of the signal alone. When the playback file also contains
+software-added noise, a power meter at the generator output reads signal plus noise, so that
+reading must not be passed as `--gen-dbm`. The splitter's loss on each output is a value you pass: an
+ideal 2-way split is 3.01 dB, and a real splitter adds some excess loss.
+
+```bash
+snappnt link-budget --gen-dbm -10 --loss att1=30 --loss splitter=3 --loss att2=30 \
+    --loss dc_block=1 --esp32-nf-db 5 --scenario-cn0-dbhz 50
+```
+
+With these example values the input level is −10 − 30 − 3 − 30 − 1 = −74 dBm. A receiver noise
+figure of 5 dB (an example, not a measured value) gives a noise density of −174 + 5 =
+−169 dBm/Hz, so a noise-free signal would have C/N0 = −74 + 169 = 95 dB-Hz. This is the
+weak-signal test of the section "Next step" below.
+
+- `--scenario-cn0-dbhz` checks the software-noise test (step 1 of the procedure). The noise in
+  the playback file has density N0_inj = P_in − C/N0 of the scenario. The command prints it
+  next to the receiver's own noise density, and the C/N0 the receiver would actually see with
+  both noises. The check passes when the injected noise is at least `--margin-db` above the
+  receiver's noise. The default of 10 dB, which gives a C/N0 error of about 0.4 dB, is a
+  choice made for this tool, not a value from a source (decision D-012). Exit code 1 means the
+  check failed.
+- `--esp32-loss` and `--ref-loss` list the losses on each branch after the splitter;
+  `--ref-nf-db` turns on the reference receiver, and `--ref-loss` without it is an error. `--loss` is the part of the path shared by
+  both.
+- The noise density uses 290 K (−174 dBm/Hz plus the noise figure), the usual convention for
+  noise figures. Signal power is the power in the received band; quantisation and filter losses
+  inside the receiver are not included.
+- TODO: the noise figures of the ESP32 and of the reference receiver are not verified. A bench
+  measurement would settle them.
+
+Record the inputs and results of each run in the
+[conducted test log template](conducted-test-log-template.md).
+
 ## Procedure
 
 1. **Write the playback file.**

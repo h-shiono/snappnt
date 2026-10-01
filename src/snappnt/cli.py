@@ -153,6 +153,58 @@ def cmd_sweep(a: argparse.Namespace) -> int:
     return 0
 
 
+def _parse_loss(text: str) -> float:
+    """A loss in dB, written as `<dB>` or `<label>=<dB>`."""
+    try:
+        return float(text.rsplit("=", 1)[-1])
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a loss in dB: {text!r}") from None
+
+
+def cmd_link_budget(a: argparse.Namespace) -> int:
+    from snappnt.eval.linkbudget import evaluate_branches
+
+    if a.ref_nf_db is None and a.ref_loss:
+        print("error: --ref-loss needs --ref-nf-db", file=sys.stderr)
+        return 2
+    branches = {"ESP32": (a.esp32_loss or [], a.esp32_nf_db)}
+    if a.ref_nf_db is not None:
+        branches["reference"] = (a.ref_loss or [], a.ref_nf_db)
+    for name, (own, _) in branches.items():
+        if not (a.loss or own):
+            print(
+                f"error: no losses given for the {name} path; pass --loss, or --loss 0 "
+                "if there really is none",
+                file=sys.stderr,
+            )
+            return 2
+    try:
+        results = evaluate_branches(
+            a.gen_dbm, a.loss or [], branches, a.scenario_cn0_dbhz, a.margin_db
+        )
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    for r in results:
+        print(f"[{r.name}]")
+        print(f"  input level          {r.p_in_dbm:8.2f} dBm")
+        print(f"  receiver NF          {r.nf_db:8.2f} dB (input)")
+        print(f"  receiver noise       {r.noise_dbm_hz:8.2f} dBm/Hz")
+        print(f"  C/N0, no added noise {r.cn0_dbhz:8.2f} dB-Hz")
+        c = r.noise_check
+        if c is not None:
+            print(f"  injected noise       {c.injected_dbm_hz:8.2f} dBm/Hz")
+            print(f"  injected - receiver  {c.ratio_db:8.2f} dB (margin {a.margin_db:.1f} dB)")
+            print(f"  C/N0 at receiver     {c.effective_cn0_dbhz:8.2f} dB-Hz")
+            print(f"  C/N0 error           {c.error_db:8.2f} dB")
+            print(
+                "  check                " + ("ok" if c.ok else "FAILED: receiver noise is too high")
+            )
+    if a.scenario_cn0_dbhz is not None and not all(r.noise_check.ok for r in results):
+        return 1
+    return 0
+
+
 def cmd_capture(a: argparse.Namespace) -> int:
     from snappnt.io.espsdr_capture import (
         LIVE_ONLY_CHECKS,
@@ -302,6 +354,40 @@ def build_parser() -> argparse.ArgumentParser:
         s.add_argument("--blocks", type=int, default=1, help="non-coherent blocks")
         s.add_argument("--pfa", type=float, default=1e-3)
         s.set_defaults(func=func)
+
+    s = sub.add_parser("link-budget", help="input level and C/N0 for a conducted test")
+    s.add_argument(
+        "--gen-dbm",
+        type=float,
+        required=True,
+        help="generator output of the signal alone, without added noise [dBm]",
+    )
+    s.add_argument(
+        "--loss",
+        type=_parse_loss,
+        action="append",
+        metavar="[LABEL=]DB",
+        help="loss shared by both receivers [dB], repeatable",
+    )
+    s.add_argument(
+        "--esp32-loss",
+        type=_parse_loss,
+        action="append",
+        metavar="[LABEL=]DB",
+        help="loss on the ESP32 branch only (splitter output, attenuator, DC block) [dB]",
+    )
+    s.add_argument("--esp32-nf-db", type=float, required=True, help="ESP32 noise figure [dB]")
+    s.add_argument(
+        "--ref-loss",
+        type=_parse_loss,
+        action="append",
+        metavar="[LABEL=]DB",
+        help="loss on the reference receiver branch only [dB]",
+    )
+    s.add_argument("--ref-nf-db", type=float, help="reference receiver noise figure; enables it")
+    s.add_argument("--scenario-cn0-dbhz", type=float, help="C/N0 set in software, to check")
+    s.add_argument("--margin-db", type=float, default=10.0, help="required noise ratio [dB]")
+    s.set_defaults(func=cmd_link_budget)
 
     s = sub.add_parser("capture", help="capture snapshots from an ESP-SDR board to SigMF")
     s.add_argument("port", nargs="?", help="serial port (not needed with --dry-run)")

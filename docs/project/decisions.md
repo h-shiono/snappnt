@@ -122,3 +122,16 @@ an earlier one and says so.
 - **Alternatives:** One file with several SigMF `captures` segments. It is valid SigMF, but
   `read_sigmf` and `acquire` would have to be changed to treat each segment separately, which
   is outside this issue.
+
+## D-012 Link budget calculator defaults (2026-10-01)
+
+- **Decision:** `snappnt link-budget` computes the receiver noise density at a reference
+  temperature of 290 K (−174 dBm/Hz plus the noise figure). Its check for software-added noise
+  requires the injected noise density to be at least 10 dB above the receiver's own; the margin
+  can be changed with `--margin-db`. The generator power, the losses and the noise figures have
+  no defaults.
+- **Why:** 290 K is the convention in which noise figures are specified. At 10 dB the receiver's
+  own noise raises the total noise density by 0.41 dB, so the C/N0 error stays below
+  0.5 dB; 10 dB is this project's choice, not a value from a source.
+- **Alternatives:** Reading noise figures from the device YAML files: no verified value exists
+  there yet. A smaller margin such as 6 dB: the C/N0 error would be about 1 dB.
