@@ -60,6 +60,7 @@ nav:
       - results/index.md
       - False-alarm rate: results/false-alarm.md
       - Detection probability: results/pd-curves.md
+      - Noise-folding loss: results/aliasing-loss.md
   - Project:
       - Milestones: project/milestones.md
       - Decision log: project/decisions.md

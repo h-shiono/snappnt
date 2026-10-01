@@ -9,12 +9,12 @@ Recorded pages:
 |---|---|
 | [False-alarm rate versus the configured `pfa`](false-alarm.md) | #1 |
 | [Detection probability versus C/N0](pd-curves.md) | #2 |
+| [Noise-folding loss at low sample rates](aliasing-loss.md) | #3 |
 
 Planned pages:
 
 | Page | Issue |
 |---|---|
-| Noise-folding loss at low sample rates | #3 |
 | C/N0 estimate bias | #4 |
 | LEO Doppler rate | #16 |
 
