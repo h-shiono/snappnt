@@ -46,18 +46,23 @@ def write_sigmf(
     hw: str = "",
     truth: dict[str, Any] | None = None,
     extra_global: dict[str, Any] | None = None,
+    extra_capture: dict[str, Any] | None = None,
 ) -> Path:
-    """Write samples + metadata. Returns the base path (without suffix)."""
+    """Write samples + metadata. Returns the base path (without suffix).
+
+    ``extra_capture`` adds keys to the capture segment (for example ``core:datetime``). The
+    sample file and the metadata file are first written under temporary names (``.tmp`` added)
+    and renamed only when both are complete. If anything fails, the temporary files are removed
+    and an existing recording with the same base name is left untouched."""
     base = _base(path)
     base.parent.mkdir(parents=True, exist_ok=True)
     x = np.asarray(samples)
     if datatype == "cf32_le":
-        x.astype("<c8").tofile(_with(base, ".sigmf-data"))
+        raw = x.astype("<c8")
     elif datatype in ("ci16_le", "ci8"):
-        arr = np.empty(x.size, dtype=_DTYPES[datatype])
-        arr["i"] = np.round(x.real)
-        arr["q"] = np.round(x.imag)
-        arr.tofile(_with(base, ".sigmf-data"))
+        raw = np.empty(x.size, dtype=_DTYPES[datatype])
+        raw["i"] = np.round(x.real)
+        raw["q"] = np.round(x.imag)
     else:
         raise ValueError(f"unsupported datatype {datatype}")
 
@@ -78,6 +83,8 @@ def write_sigmf(
     capture: dict[str, Any] = {"core:sample_start": 0}
     if center_frequency_hz is not None:
         capture["core:frequency"] = float(center_frequency_hz)
+    if extra_capture:
+        capture.update(extra_capture)
 
     annotations = []
     if truth is not None:
@@ -91,7 +98,18 @@ def write_sigmf(
         )
 
     meta = {"global": global_, "captures": [capture], "annotations": annotations}
-    _with(base, ".sigmf-meta").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    data_path = _with(base, ".sigmf-data")
+    meta_path = _with(base, ".sigmf-meta")
+    data_tmp = data_path.with_name(data_path.name + ".tmp")
+    meta_tmp = meta_path.with_name(meta_path.name + ".tmp")
+    try:
+        raw.tofile(data_tmp)
+        meta_tmp.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        data_tmp.replace(data_path)
+        meta_tmp.replace(meta_path)
+    finally:
+        data_tmp.unlink(missing_ok=True)
+        meta_tmp.unlink(missing_ok=True)
     return base
 
 

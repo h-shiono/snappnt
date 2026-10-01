@@ -49,7 +49,8 @@ B210-class USRP (TX) ─ 30 dB ─ splitter ─┬─ 30 dB ─ DC block ─ XIA
    Build the command with `snappnt.io.generators.uhd_tx_cmd(...)` or
    `hackrf_transfer_cmd(...)`, read it, then run it.
 4. **Capture with the XIAO.**
-   Requires the ESP-SDR client (issue #6) and the `snappnt capture` command (issue #8).
+   `snappnt capture <port> --freq-hz 2492e6 -o out/run1`, see "Capturing with `snappnt capture`"
+   below.
 5. **Acquire.**
    `snappnt acquire <file> --signal navic_s_sps --prn 10 --freq-span 60000`
    The crystal errors of the ESP32 and the generator can add up to tens of kHz, so search
@@ -57,6 +58,41 @@ B210-class USRP (TX) ─ 30 dB ─ splitter ─┬─ 30 dB ─ DC block ─ XIA
 6. **Vary C/N0 and compare.**
    Regenerate the playback file with different C/N0 values, measure the detection probability,
    and plot it over the simulated curve from `snappnt sweep scenarios/navic_s_esp32c3.yaml`.
+
+## Capturing with `snappnt capture`
+
+```bash
+snappnt capture <serial port> --freq-hz 2492e6 --rate-sps 80e6 -n 16380 --count 5 -o out/run1
+snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send nothing
+```
+
+- The firmware tunes whole MHz only (100 to 6000). The remainder of the signal's carrier
+  frequency (here 28 kHz for 2492.028 MHz) appears as a frequency offset in processing, so
+  search widely in `snappnt acquire`.
+- `--gain auto` (default) selects the hardware AGC (`GAIN HARDWARE`). `--gain <index>` sets
+  `GAIN MANUAL <index>`. The firmware does not report the AGC gain it chose, so `snappnt:gain_index`
+  is `null` in AGC mode.
+- `--bandwidth-mhz` sets the analog bandwidth; without it the board's setting is unchanged.
+  `--bits 8` uses the 8-bit transfer, `--bits 10` (default) the packed 10-bit transfer.
+- The command refuses to start if any output file already exists; `--overwrite` replaces them.
+  `--dry-run` prints the full sequence including the final `RELEASE`. It checks the frequency,
+  the sample rate in the ESP-SDR rate table, the bandwidth (0, or 14 to 62 MHz) and the bit
+  depth. The maximum gain index, the rates a particular chip offers and the maximum samples per
+  capture are reported by the board (`LIMITS?`, `INFO`), so only a live run checks them. A file
+  that cannot be written (for example a full disk) ends the run with exit code 1, naming the
+  capture. Each recording is written under temporary names and renamed only when both files
+  are complete, so a failed write leaves no partial files and an existing recording that
+  `--overwrite` was meant to replace stays intact.
+- With `--count N` greater than 1 each capture is its own recording, `run1_0000`, `run1_0001`,
+  and so on (decision D-011). Captures already written stay if a later one fails; a damaged
+  capture (wrong CRC-32) ends the run with exit code 1 after the port is resynchronised.
+- Metadata in each `.sigmf-meta`: `core:hw` (`ESP-SDR` and the chip family), `snappnt:espsdr_info`
+  (the firmware's `INFO` reply), `snappnt:host_time_utc` and `core:datetime`,
+  `snappnt:gain_mode`, `snappnt:gain_index`, `snappnt:analog_bandwidth_mhz`,
+  `snappnt:espsdr_transfer_bits`, `snappnt:espsdr_capture_us`. The serial port name, host name,
+  user name and output path are not recorded.
+- **Not verified on hardware.** The command sequence follows the protocol page
+  (`docs/design/espsdr-protocol.md`); verification is tracked in issue #11.
 
 ## Next step: a weak signal without added noise
 
