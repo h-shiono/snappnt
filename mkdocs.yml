@@ -54,6 +54,7 @@ nav:
   - Getting started: getting-started.md
   - Design:
       - Architecture: design/architecture.md
+      - ESP-SDR protocol: design/espsdr-protocol.md
   - Guides:
       - Conducted test: guides/conducted-test.md
   - Results:
