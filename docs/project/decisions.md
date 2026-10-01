@@ -109,3 +109,17 @@ an earlier one and says so.
   installation was not available in that environment). The Claude GitHub App instead of a
   personal access token: avoids a personal token, but its broad permission set and bot identity
   need `allowed_bots` for every hand-off; the token keeps start conditions simple.
+
+## D-011 Interpolation changes only code phase and frequency (2026-10-01)
+
+- **Decision:** `acquire(..., refine=True)` refines `code_phase_chips` and `freq_offset_hz` by
+  three-point parabolic interpolation of the power grid. The default is `refine=False`. The
+  detection metric, threshold and `cn0_dbhz_est` are always those of the peak cell, and
+  `AcqResult` has no new field.
+- **Why:** The values in `AcqResult` must not change for existing callers (issue #4 stop
+  condition). The measured C/N0 bias is dominated by a data-bit sign change inside one block
+  and by leakage of the signal into the noise-floor estimate, not by the peak position (see
+  [Bias of the C/N0 estimate](../results/cn0-bias.md)).
+- **Alternatives:** Correct the peak power with the interpolated height (changes
+  `cn0_dbhz_est`, a public output; left for the maintainer to decide). Interpolate the
+  correlation magnitude instead of the power (not compared).

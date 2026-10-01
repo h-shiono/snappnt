@@ -1,0 +1,49 @@
+condition,n_blocks,cause,setting,refine,trials,bias_mean_db,bias_se_db,p_detect,abs_code_err_chips,abs_freq_err_hz
+navic_s_ideal,1,baseline,none,0,200,-0.1011,0.0379,1.0000,0.0000,0.0000
+navic_s_ideal,1,baseline,none,1,200,-0.1011,0.0379,1.0000,0.0082,5.2532
+navic_s_ideal,1,frequency,0.25 step,0,200,-0.3277,0.0392,1.0000,0.0000,31.2500
+navic_s_ideal,1,frequency,0.25 step,1,200,-0.3277,0.0392,1.0000,0.0085,9.7178
+navic_s_ideal,1,frequency,0.5 step,0,200,-0.8574,0.0400,1.0000,0.0000,62.5000
+navic_s_ideal,1,frequency,0.5 step,1,200,-0.8574,0.0400,1.0000,0.0092,11.0653
+navic_s_ideal,1,code_phase,0.25 sample,0,200,-0.0905,0.0379,1.0000,0.0312,0.0000
+navic_s_ideal,1,code_phase,0.25 sample,1,200,-0.0905,0.0379,1.0000,0.0300,5.2403
+navic_s_ideal,1,code_phase,0.5 sample,0,200,-0.0905,0.0379,1.0000,0.0625,0.0000
+navic_s_ideal,1,code_phase,0.5 sample,1,200,-0.0905,0.0379,1.0000,0.0611,5.2403
+navic_s_ideal,1,sign_change,one flip in the middle,0,200,-3.3617,0.0417,1.0000,0.0000,184.3750
+navic_s_ideal,1,sign_change,one flip in the middle,1,200,-3.3617,0.0417,1.0000,0.0132,187.6568
+navic_s_ideal,1,quantisation,10 bit,0,200,-0.1014,0.0379,1.0000,0.0000,0.0000
+navic_s_ideal,1,quantisation,10 bit,1,200,-0.1014,0.0379,1.0000,0.0082,5.2530
+navic_s_ideal,1,all,"0.5 step, 0.5 sample, flip, 10 bit",0,200,-2.5081,0.0421,1.0000,0.0625,187.5000
+navic_s_ideal,1,all,"0.5 step, 0.5 sample, flip, 10 bit",1,200,-2.5081,0.0421,1.0000,0.0618,191.5920
+navic_s_ideal,4,baseline,none,0,200,-0.0905,0.0380,1.0000,0.0000,0.0000
+navic_s_ideal,4,baseline,none,1,200,-0.0905,0.0380,1.0000,0.0081,19.4547
+navic_s_ideal,4,frequency,0.25 step,0,200,-0.3834,0.0410,1.0000,0.0000,125.0000
+navic_s_ideal,4,frequency,0.25 step,1,200,-0.3834,0.0410,1.0000,0.0089,38.7488
+navic_s_ideal,4,frequency,0.5 step,0,200,-0.8060,0.0419,1.0000,0.0000,250.0000
+navic_s_ideal,4,frequency,0.5 step,1,200,-0.8060,0.0419,1.0000,0.0099,44.6073
+navic_s_ideal,4,code_phase,0.25 sample,0,200,-0.0798,0.0379,1.0000,0.0312,0.0000
+navic_s_ideal,4,code_phase,0.25 sample,1,200,-0.0798,0.0379,1.0000,0.0301,19.3791
+navic_s_ideal,4,code_phase,0.5 sample,0,200,-0.0798,0.0379,1.0000,0.0625,0.0000
+navic_s_ideal,4,code_phase,0.5 sample,1,200,-0.0798,0.0379,1.0000,0.0612,19.3791
+navic_s_ideal,4,sign_change,one flip in the middle,0,200,-0.1483,0.0354,1.0000,0.0000,0.0000
+navic_s_ideal,4,sign_change,one flip in the middle,1,200,-0.1483,0.0354,1.0000,0.0083,19.8013
+navic_s_ideal,4,quantisation,10 bit,0,200,-0.0908,0.0380,1.0000,0.0000,0.0000
+navic_s_ideal,4,quantisation,10 bit,1,200,-0.0908,0.0380,1.0000,0.0081,19.4560
+navic_s_ideal,4,all,"0.5 step, 0.5 sample, flip, 10 bit",0,200,-0.8921,0.0386,1.0000,0.0625,250.0000
+navic_s_ideal,4,all,"0.5 step, 0.5 sample, flip, 10 bit",1,200,-0.8921,0.0386,1.0000,0.0614,44.2321
+navic_s_esp32c3,1,baseline,none,0,200,-1.5475,0.0287,1.0000,0.0089,0.0000
+navic_s_esp32c3,1,baseline,none,1,200,-1.5475,0.0287,1.0000,0.0070,96.7650
+navic_s_esp32c3,1,frequency,0.25 step,0,200,-1.7656,0.0304,1.0000,0.0093,610.3516
+navic_s_esp32c3,1,frequency,0.25 step,1,200,-1.7656,0.0304,1.0000,0.0076,194.6035
+navic_s_esp32c3,1,frequency,0.5 step,0,200,-2.2372,0.0313,1.0000,0.0092,1220.7031
+navic_s_esp32c3,1,frequency,0.5 step,1,200,-2.2372,0.0313,1.0000,0.0076,243.6108
+navic_s_esp32c3,1,code_phase,0.25 sample,0,200,-1.5492,0.0287,1.0000,0.0090,0.0000
+navic_s_esp32c3,1,code_phase,0.25 sample,1,200,-1.5492,0.0287,1.0000,0.0073,97.4225
+navic_s_esp32c3,1,code_phase,0.5 sample,0,200,-1.5378,0.0287,1.0000,0.0056,0.0000
+navic_s_esp32c3,1,code_phase,0.5 sample,1,200,-1.5378,0.0287,1.0000,0.0057,96.7776
+navic_s_esp32c3,1,sign_change,one flip in the middle,0,200,-4.8114,0.0412,1.0000,0.0147,3601.0742
+navic_s_esp32c3,1,sign_change,one flip in the middle,1,200,-4.8114,0.0412,1.0000,0.0136,3662.1919
+navic_s_esp32c3,1,quantisation,10 bit,0,200,-1.5474,0.0287,1.0000,0.0089,0.0000
+navic_s_esp32c3,1,quantisation,10 bit,1,200,-1.5474,0.0287,1.0000,0.0070,96.7863
+navic_s_esp32c3,1,all,"0.5 step, 0.5 sample, flip, 10 bit",0,200,-4.0181,0.0361,1.0000,0.0109,3662.1094
+navic_s_esp32c3,1,all,"0.5 step, 0.5 sample, flip, 10 bit",1,200,-4.0181,0.0361,1.0000,0.0105,3760.5065
