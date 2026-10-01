@@ -43,13 +43,18 @@ pushed by then is lost. Check the time with `date -u` before each long step.
   (for example the code and tests, before running result sweeps). Never leave more than about
   30 minutes of work unpushed.
 - Before a long computation (a detection-probability sweep, many trials, a large simulation),
-  run a small version first, time it, and size the full run so that it ends at least 30
-  minutes before the limit. Run it under `timeout` with that budget. If the full size does not
-  fit, use the largest size that does, and state the size used and the reason on the result
-  page and in the pull request.
+  run a small version first, time it, and plan it so that this run ends at least 30 minutes
+  before the limit. Run it under `timeout` with that budget.
+- Never reduce a size that the issue or the approved plan states (number of trials, C/N0
+  grid, cases): a smaller run does not meet the acceptance criterion. If the full computation
+  does not fit in one run, split it into parts (for example one case or a range of C/N0 per
+  part), write each finished part's results to a file on the branch, push, and leave the rest
+  for the next run. Only a size that neither the issue nor the plan states may be chosen to
+  fit; say on the result page and in the pull request which size was used and why.
 - If the remaining work cannot finish before the limit, push what is done and post an issue
   comment starting with `**[worker]**`, a blank line, then `Progress:` followed by what is
-  done, what is left and the branch name. Keep the label. The orchestrator replies, and that
+  done, what is left and the branch name. This applies to every step, including fixes on an
+  open pull request. Keep the label. The orchestrator replies, and that
   reply starts the next run, which continues from the branch.
 - If the issue already has three `Progress:` comments from you and still no pull request,
   do not continue: report it in the issue and set `status:blocked`.

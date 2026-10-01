@@ -100,7 +100,8 @@ progress finish; no new run starts. Nothing else needs to change.
 
 - **GitHub Actions minutes.** Private repositories on GitHub Pro include 3,000 minutes per
   month. Most event-triggered runs that find nothing to do finish in a few minutes; runs that
-  implement an issue can take up to the 60-minute limit.
+  implement an issue can take up to the 120-minute limit, and an issue that needs several
+  runs (see the `Progress:` comments above) uses that much per run.
 - **Claude usage.** Runs consume the usage of the plan behind `CLAUDE_CODE_OAUTH_TOKEN`,
   shared with any other use of that plan.
 - **Scheduled workflows** run from the default branch only.
