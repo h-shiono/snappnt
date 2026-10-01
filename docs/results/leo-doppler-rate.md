@@ -102,8 +102,8 @@ leave a loss of only about 0.06 dB at the edge of a step (from the formula, not 
 
 Example (`tests/test_leo_doppler.py`): 80 ms snapshot, C/N0 34 dB-Hz, true rate −1572 Hz/s,
 frequency range ±80 Hz around the Doppler. With rate zero the peak metric is 40 against a
-threshold of 18.5. With a rate search over −1900 to −1300 Hz/s (spacing 37.5 Hz/s) the metric is 137
-(5.3 dB higher), and the peak rate is −1627 Hz/s. The peak is flat near the true rate, so the
+threshold of 18.5. With a rate search over −1900 to −1300 Hz/s (spacing 37.5 Hz/s) the metric is 136
+(5.3 dB higher), and the peak rate is −1637.5 Hz/s. The peak is flat near the true rate, so the
 test accepts a rate within two steps of the truth.
 
 ## From which coherent time a rate search is needed
