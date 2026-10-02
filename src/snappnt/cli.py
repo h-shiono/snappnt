@@ -124,6 +124,7 @@ def cmd_acquire(a: argparse.Namespace) -> int:
             freq_range_hz=(-a.freq_span, a.freq_span),
             n_blocks=a.blocks,
             pfa=a.pfa,
+            remove_dc=a.remove_dc,
         )  # fmt: skip
         t = truth_by_prn.get(prn)
         mark = ""
@@ -150,6 +151,7 @@ def cmd_sweep(a: argparse.Namespace) -> int:
         n_blocks=a.blocks,
         pfa=a.pfa,
         seed=a.seed,
+        remove_dc=a.remove_dc,
     )
     print(" C/N0   Pd     Pwrong  metric")
     for p in pts:
@@ -380,6 +382,12 @@ def build_parser() -> argparse.ArgumentParser:
         s.add_argument("--freq-span", type=float, default=50e3, help="search +/- [Hz]")
         s.add_argument("--blocks", type=int, default=1, help="non-coherent blocks")
         s.add_argument("--pfa", type=float, default=1e-3)
+        s.add_argument(
+            "--remove-dc",
+            choices=("none", "mean", "linear"),
+            default="none",
+            help="subtract the DC offset estimated from the snapshot before acquisition",
+        )
         s.set_defaults(func=func)
 
     s = sub.add_parser("link-budget", help="input level and C/N0 for a conducted test")

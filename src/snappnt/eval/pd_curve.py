@@ -44,6 +44,7 @@ def sweep(
     pfa: float = 1e-3,
     code_tol_chips: float = 0.5,
     seed: int = 0,
+    remove_dc: str = "none",
 ) -> list[SweepPoint]:
     """Vary C/N0 of the scenario's first satellite; code phase and Doppler are randomised."""
     spec = load_signal(base.signal)
@@ -74,6 +75,7 @@ def sweep(
                 freq_range_hz=freq_range_hz,
                 n_blocks=n_blocks,
                 pfa=pfa,
+                remove_dc=remove_dc,
             )
             metrics.append(res.metric)
             if res.detected:
