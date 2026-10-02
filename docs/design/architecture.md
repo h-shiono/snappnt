@@ -60,8 +60,9 @@ unchanged (a test compares the samples of every scenario in `scenarios/` with st
 | `spurs: [{offset_hz, power_db}]` | Fixed tones. `offset_hz` is the offset from the tuned frequency in the samples, and must be inside ±half of the rate at which samples are generated. `power_db` is the tone power divided by the total noise power per sample at the generation rate (noise has unit variance); it is not the height above the noise floor in a spectrum, where a tone of power ratio 1 stands `10·log10(N)` dB above the floor of one bin in an N-point spectrum. |
 
 Processing order: signal and noise at the generation rate, then spurs, analog low-pass,
-output-band low-pass (decimation method `ideal`), decimation, and the ADC. A spur outside the
-analog bandwidth is removed. A spur outside the output band folds to an aliased frequency when
+output-band low-pass (decimation method `ideal`), decimation, and the ADC. With a generation rate
+(`generate_rate_hz`), a spur outside the analog bandwidth is removed; without one, the analog
+bandwidth has no effect and the spur stays. A spur outside the output band folds to an aliased frequency when
 the decimation method is `none`. The DC offset is added in the ADC after the gain of the
 automatic gain control (AGC) is set from the signal alone, so the offset is not part of the
 level the AGC holds. The offset is constant over a snapshot; the drift of about 25 counts

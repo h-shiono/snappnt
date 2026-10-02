@@ -134,7 +134,7 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
             x = lowpass(x, fs_gen, fs_nominal)
         x = decimate_without_filter(x, rx.decimation_factor)
 
-    has_dc = rx.dc_offset_i != 0.0 or rx.dc_offset_q != 0.0
+    has_dc = rx.dc_offset_i is not None and rx.dc_offset_q is not None
     if rx.quantization_bits is not None:
         if has_dc:
             x = quantize_with_offset(

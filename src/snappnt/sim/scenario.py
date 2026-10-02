@@ -82,8 +82,10 @@ class ReceiverConfig:
     decimation_factor: int | None = None
     decimation_method: str | None = None
     analog_bandwidth_hz: float | None = None
-    dc_offset_i: float = 0.0  # fraction of ADC full scale, added before rounding
-    dc_offset_q: float = 0.0
+    # Fraction of ADC full scale, added before rounding. None means dc_offset is not set;
+    # an explicit zero is kept so that the truth records it.
+    dc_offset_i: float | None = None
+    dc_offset_q: float | None = None
     spurs: tuple[tuple[float, float], ...] = ()  # (baseband offset_hz, power_db re noise power)
 
 
@@ -132,19 +134,24 @@ def _decimation_from_dict(
 
 def _dc_and_spurs_from_dict(
     d: dict[str, Any], sample_rate_hz: float, generate_rate_hz: float | None
-) -> tuple[float, float, tuple[tuple[float, float], ...]]:
-    dc = d.get("dc_offset") or {}
-    dc_i, dc_q = float(dc.get("i", 0.0)), float(dc.get("q", 0.0))
-    for name, value in (("i", dc_i), ("q", dc_q)):
-        if not -1.0 <= value < 1.0:
-            raise ValueError(f"dc_offset.{name} must be in [-1, 1), not {value}")
-    if (dc_i != 0.0 or dc_q != 0.0) and d.get("quantization_bits") is None:
-        raise ValueError("receiver.dc_offset needs quantization_bits")
+) -> tuple[float | None, float | None, tuple[tuple[float, float], ...]]:
+    dc = d.get("dc_offset")
+    dc_i: float | None = None
+    dc_q: float | None = None
+    if dc is not None:
+        dc_i, dc_q = float(dc.get("i", 0.0)), float(dc.get("q", 0.0))
+        for name, value in (("i", dc_i), ("q", dc_q)):
+            if not -1.0 <= value < 1.0:  # false for NaN as well
+                raise ValueError(f"dc_offset.{name} must be in [-1, 1), not {value}")
+        if d.get("quantization_bits") is None:
+            raise ValueError("receiver.dc_offset needs quantization_bits")
     nyquist_hz = (generate_rate_hz or sample_rate_hz) / 2.0
     spurs = []
     for spur in d.get("spurs") or []:
         offset_hz, power_db = float(spur["offset_hz"]), float(spur["power_db"])
-        if abs(offset_hz) >= nyquist_hz:
+        if not np.isfinite(power_db):
+            raise ValueError(f"spur power_db must be a finite number, not {power_db}")
+        if not abs(offset_hz) < nyquist_hz:  # true for NaN as well
             raise ValueError(
                 f"spur offset_hz ({offset_hz}) must be inside +-{nyquist_hz} Hz "
                 "(half the rate at which samples are generated)"

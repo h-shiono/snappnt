@@ -20,5 +20,8 @@ receiver:
     # estimate: a Hann-windowed tone peak stands 10*log10(2*1024/3) = 28.3 dB above the
     # per-bin noise for power ratio 1, so 16 - 28.3 = -12.3 dB, rounded to -12.
     - {offset_hz: -12000000, power_db: -12}
+# analog_bandwidth_hz (14 MHz from the device file) has no effect here, because the scenario has
+# no generate_rate_hz and decimation; the spur is therefore kept. This matches the bench value,
+# which was measured with 62 MHz bandwidth.
 satellites:
   - {prn: 10, cn0_dbhz: 58, doppler_hz: 0, code_phase_chips: 800.25}

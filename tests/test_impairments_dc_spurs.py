@@ -106,11 +106,26 @@ def test_dc_offset_clips_at_full_scale():
         {"quantization_bits": 10, "dc_offset": {"q": -1.5}},
         {"spurs": [{"offset_hz": 2_000_000, "power_db": 0}]},  # at Nyquist
         {"spurs": [{"offset_hz": -3_000_000, "power_db": 0}]},  # above Nyquist
+        {"dc_offset": {"i": 0, "q": 0}},  # explicit zero still needs quantization
+        {"quantization_bits": 10, "dc_offset": {"i": float("nan")}},
+        {"spurs": [{"offset_hz": float("nan"), "power_db": 0}]},
+        {"spurs": [{"offset_hz": 1_000_000, "power_db": float("nan")}]},
+        {"spurs": [{"offset_hz": 1_000_000, "power_db": float("inf")}]},
+        {"spurs": [{"offset_hz": 1_000_000, "power_db": float("-inf")}]},
     ],
 )
 def test_validation(receiver):
     with pytest.raises(ValueError):
         scenario_from_dict(_noise_scenario(**receiver))
+
+
+def test_explicit_zero_dc_offset_is_recorded_in_truth():
+    _, truth = generate(
+        scenario_from_dict(_noise_scenario(quantization_bits=10, dc_offset={"i": 0, "q": 0}))
+    )
+    assert truth["dc_offset_fullscale"] == {"i": 0.0, "q": 0.0}
+    _, truth = generate(scenario_from_dict(_noise_scenario(quantization_bits=10)))
+    assert "dc_offset_fullscale" not in truth
 
 
 def test_spur_inside_band_direct_rate():
