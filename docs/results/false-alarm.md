@@ -130,7 +130,7 @@ agreed with theory above and is the fastest of the four.
 ## How to reproduce
 
 ```bash
-pip install -e ".[dev]"
-python tests/test_false_alarm.py      # prints the results table; takes several minutes
-pytest -m slow -q                     # the automated check
+uv sync
+uv run python tests/test_false_alarm.py      # prints the results table; takes several minutes
+uv run pytest -m slow -q                     # the automated check
 ```

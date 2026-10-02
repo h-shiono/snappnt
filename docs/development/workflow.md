@@ -3,10 +3,10 @@
 ## Before opening a pull request
 
 ```bash
-ruff check .
-ruff format --check .
-pytest -q
-mkdocs build --strict      # pip install -e ".[docs]"
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest -q
+uv run mkdocs build --strict
 ```
 
 Commits are signed off under the Developer Certificate of Origin (`git commit -s`); see

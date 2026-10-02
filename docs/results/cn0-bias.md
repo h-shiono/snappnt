@@ -228,7 +228,7 @@ For B = 4 the coherent time T is 1 ms and the frequency step is 500 Hz.
 About 24 minutes for the main table and about 2.5 minutes for the C/N0 table on one CPU core:
 
 ```bash
-pip install -e ".[dev]"
-python tests/test_cn0_bias.py 200               # docs/results/cn0_bias.csv
-python tests/test_cn0_bias.py baseline_versus_cn0   # docs/results/cn0_bias_baseline_vs_cn0.csv
+uv sync
+uv run python tests/test_cn0_bias.py 200               # docs/results/cn0_bias.csv
+uv run python tests/test_cn0_bias.py baseline_versus_cn0   # docs/results/cn0_bias_baseline_vs_cn0.csv
 ```

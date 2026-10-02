@@ -14,9 +14,10 @@ minus the change of the tuned frequency in baseband. With ``--acquire-prn`` it r
 on the first ``--acquire-max`` captures of each group, as recorded and with the capture mean
 subtracted.
 
-    pip install -e ".[plot]"
-    python tools/plot_esp32_bench.py out/noise out/sign -o docs/results/esp32c3-bench-no-rf.png
-    python tools/plot_esp32_bench.py out/noise --acquire-prn 10 --acquire-center-hz 28000
+    uv run --extra plot python tools/plot_esp32_bench.py out/noise out/sign \\
+        -o docs/results/esp32c3-bench-no-rf.png
+    uv run --extra plot python tools/plot_esp32_bench.py out/noise \\
+        --acquire-prn 10 --acquire-center-hz 28000
 
 Used for docs/results/esp32c3-bench-no-rf.md. The recordings themselves are not committed.
 """

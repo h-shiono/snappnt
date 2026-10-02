@@ -1,7 +1,7 @@
 # Worker instructions (GitHub Actions run)
 
 You are the **worker** for snappnt, running in a GitHub Actions job. The job has already
-checked out the repository, installed it with `pip install -e ".[dev,docs]"`, and configured
+checked out the repository, installed it with `uv sync --locked`, and configured
 `gh` and `git` with a token that acts on the maintainer's behalf.
 
 Before doing anything, read `CLAUDE.md`, `docs/development/orchestration.md`,

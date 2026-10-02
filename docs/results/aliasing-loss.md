@@ -130,12 +130,12 @@ About 31 minutes for the two `none` sweeps and about 20 minutes for the two `ide
 with two sweeps in parallel on two CPU cores. Every setting is given explicitly:
 
 ```bash
-pip install -e ".[dev]"
+uv sync
 S="--trials 200 --freq-span 40000 --blocks 4 --pfa 0.001 --seed 0"
-snappnt sweep scenarios/navic_s_esp32c61_aliasing_none.yaml --cn0 40:50:1 $S -o docs/results/aliasing_none.csv
-snappnt sweep scenarios/navic_s_esp32c61_aliasing_none_b20.yaml --cn0 42:52:1 $S -o docs/results/aliasing_none_b20.csv
-snappnt sweep scenarios/navic_s_esp32c61_aliasing_ideal.yaml --cn0 34:44:1 $S -o docs/results/aliasing_ideal.csv
-snappnt sweep scenarios/navic_s_esp32c61_aliasing_ideal_b20.yaml --cn0 34:44:1 $S -o docs/results/aliasing_ideal_b20.csv
+uv run snappnt sweep scenarios/navic_s_esp32c61_aliasing_none.yaml --cn0 40:50:1 $S -o docs/results/aliasing_none.csv
+uv run snappnt sweep scenarios/navic_s_esp32c61_aliasing_none_b20.yaml --cn0 42:52:1 $S -o docs/results/aliasing_none_b20.csv
+uv run snappnt sweep scenarios/navic_s_esp32c61_aliasing_ideal.yaml --cn0 34:44:1 $S -o docs/results/aliasing_ideal.csv
+uv run snappnt sweep scenarios/navic_s_esp32c61_aliasing_ideal_b20.yaml --cn0 34:44:1 $S -o docs/results/aliasing_ideal_b20.csv
 ```
 
 ## Proposed follow-up

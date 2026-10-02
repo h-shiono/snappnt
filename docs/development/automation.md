@@ -130,7 +130,7 @@ progress finish; no new run starts. Nothing else needs to change.
 - The orchestrator's checkout keeps no git credentials, it never checks out pull request code,
   and it merges only branches of this repository named after the issue. Pull request code runs
   only in CI, which has no write-capable token.
-- `anthropics/claude-code-action`, `actions/checkout` and `actions/setup-python` are pinned to
+- `anthropics/claude-code-action`, `actions/checkout` and `astral-sh/setup-uv` are pinned to
   commit hashes, so a moved tag cannot change the code that receives the secrets. Update the
   hashes deliberately, after reading the release notes.
 - Transmit commands, pushes to `main`, and repository settings commands are denied through
