@@ -80,4 +80,4 @@ jobs:
           claude_args: >-
             --max-turns 40
             --allowedTools "Bash,Read,Glob,Grep,TodoWrite"
-            --disallowedTools "Write,Edit,Bash(gh pr checkout:*),Bash(git fetch:*),Bash(git checkout:*),Bash(git switch:*),Bash(git pull:*),Bash(pip:*),Bash(pytest:*),Bash(hackrf_transfer:*),Bash(tx_samples_from_file:*),Bash(uhd_siggen:*),Bash(git push:*),Bash(git commit:*),Bash(gh issue close:*),Bash(gh repo:*),Bash(gh secret:*),Bash(gh variable:*)"
+            --disallowedTools "Write,Edit,Bash(gh pr checkout:*),Bash(git fetch:*),Bash(git checkout:*),Bash(git switch:*),Bash(git pull:*),Bash(pip:*),Bash(uv:*),Bash(pytest:*),Bash(hackrf_transfer:*),Bash(tx_samples_from_file:*),Bash(uhd_siggen:*),Bash(git push:*),Bash(git commit:*),Bash(gh issue close:*),Bash(gh repo:*),Bash(gh secret:*),Bash(gh variable:*)"

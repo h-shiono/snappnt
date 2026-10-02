@@ -33,13 +33,13 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.12"
-      - run: python -m pip install -e ".[docs]"
+      - run: uv sync --locked
       - name: Public-safety check
-        run: python tools/check_public_safety.py
-      - run: mkdocs build --strict
+        run: uv run python tools/check_public_safety.py
+      - run: uv run mkdocs build --strict
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
