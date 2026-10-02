@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -126,6 +127,21 @@ def test_explicit_zero_dc_offset_is_recorded_in_truth():
     assert truth["dc_offset_fullscale"] == {"i": 0.0, "q": 0.0}
     _, truth = generate(scenario_from_dict(_noise_scenario(quantization_bits=10)))
     assert "dc_offset_fullscale" not in truth
+
+
+def test_half_set_dc_offset_in_code_treats_other_component_as_zero():
+    scn = scenario_from_dict(_noise_scenario(quantization_bits=10, dc_offset={"i": 0.25, "q": 0}))
+    both, truth_both = generate(scn)
+    for half in (
+        replace(scn.receiver, dc_offset_i=0.25, dc_offset_q=None),
+        replace(scn.receiver, dc_offset_i=0.25),
+    ):
+        x, truth = generate(replace(scn, receiver=half))
+        assert truth["dc_offset_fullscale"] == {"i": 0.25, "q": 0.0}
+        assert np.array_equal(x, both)
+    only_q = replace(scn.receiver, dc_offset_i=None, dc_offset_q=-0.25)
+    _, truth = generate(replace(scn, receiver=only_q))
+    assert truth["dc_offset_fullscale"] == {"i": 0.0, "q": -0.25}
 
 
 def test_spur_inside_band_direct_rate():

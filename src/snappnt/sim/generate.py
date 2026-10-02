@@ -134,12 +134,11 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
             x = lowpass(x, fs_gen, fs_nominal)
         x = decimate_without_filter(x, rx.decimation_factor)
 
-    has_dc = rx.dc_offset_i is not None and rx.dc_offset_q is not None
+    has_dc = rx.dc_offset_i is not None or rx.dc_offset_q is not None
+    dc_i, dc_q = rx.dc_offset_i or 0.0, rx.dc_offset_q or 0.0  # an omitted component is zero
     if rx.quantization_bits is not None:
         if has_dc:
-            x = quantize_with_offset(
-                x, rx.quantization_bits, rx.agc_backoff_db, (rx.dc_offset_i, rx.dc_offset_q)
-            )
+            x = quantize_with_offset(x, rx.quantization_bits, rx.agc_backoff_db, (dc_i, dc_q))
         else:
             x = quantize(x, rx.quantization_bits, rx.agc_backoff_db)
 
@@ -176,7 +175,7 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
             if rx.generate_rate_hz is not None
             else {}
         ),
-        **({"dc_offset_fullscale": {"i": rx.dc_offset_i, "q": rx.dc_offset_q}} if has_dc else {}),
+        **({"dc_offset_fullscale": {"i": dc_i, "q": dc_q}} if has_dc else {}),
         **({"spurs": [{"offset_hz": f, "power_db": p} for f, p in rx.spurs]} if rx.spurs else {}),
         "satellites": truth_sats,
     }
