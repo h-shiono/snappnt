@@ -14,39 +14,39 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip
+          enable-cache: true
       - name: Install
-        run: python -m pip install -e ".[dev]"
+        run: uv sync --locked
       - name: Lint
         run: |
-          ruff check .
-          ruff format --check .
+          uv run ruff check .
+          uv run ruff format --check .
       - name: Public-safety check
-        run: python tools/check_public_safety.py
+        run: uv run python tools/check_public_safety.py
       - name: ICD checks (spreading codes against printed tables)
-        run: pytest -m icd -q
+        run: uv run pytest -m icd -q
       - name: Loopback (simulator -> acquisition -> truth)
-        run: pytest -m loopback -q
+        run: uv run pytest -m loopback -q
       - name: All tests
-        run: pytest -q
+        run: uv run pytest -q
       - name: CLI smoke test
         run: |
-          snappnt info
-          snappnt sim scenarios/navic_s_esp32c3.yaml -o out/ci_c3
-          snappnt acquire out/ci_c3 --prn 10 --freq-span 40000
+          uv run snappnt info
+          uv run snappnt sim scenarios/navic_s_esp32c3.yaml -o out/ci_c3
+          uv run snappnt acquire out/ci_c3 --prn 10 --freq-span 40000
 
   docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.12"
-          cache: pip
+          enable-cache: true
       - name: Install
-        run: python -m pip install -e ".[docs]"
+        run: uv sync --locked
       - name: Build documentation (strict)
-        run: mkdocs build --strict
+        run: uv run mkdocs build --strict

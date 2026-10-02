@@ -20,13 +20,13 @@ USRP — can be processed and checked against known truth.
 ## Quick start
 
 ```bash
-pip install -e ".[dev]"
-snappnt info
-snappnt codes --signal navic_s_sps --prn 1-14
-snappnt sim scenarios/navic_s_esp32c3.yaml -o out/c3
-snappnt acquire out/c3 --prn 10 --freq-span 40000
-snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 48:60:2 --trials 20 -o out/pd.csv
-pytest -q
+uv sync
+uv run snappnt info
+uv run snappnt codes --signal navic_s_sps --prn 1-14
+uv run snappnt sim scenarios/navic_s_esp32c3.yaml -o out/c3
+uv run snappnt acquire out/c3 --prn 10 --freq-span 40000
+uv run snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 48:60:2 --trials 20 -o out/pd.csv
+uv run pytest -q
 ```
 
 The ESP32-C3 scenario models a XIAO ESP32C3: 80 MSa/s, a ~0.2 ms snapshot (a fifth of a
@@ -56,8 +56,8 @@ independently of the generator:
 
 ## Documentation
 
-The `docs/` directory is an MkDocs site. Build it with `pip install -e ".[docs]"` and
-`mkdocs serve`. It will be published on GitHub Pages when the repository becomes public.
+The `docs/` directory is an MkDocs site. Install it with `uv sync` and build it with
+`uv run mkdocs serve`. It will be published on GitHub Pages when the repository becomes public.
 
 ## Safety
 

@@ -126,16 +126,15 @@ parallel). Every measurement setting is given explicitly, so that a later change
 command-line default does not change the result:
 
 ```bash
-pip install -e ".[dev]"
-snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 46:60:1 --trials 200 --freq-span 40000 --blocks 1 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_esp32c3.csv
-snappnt sweep scenarios/navic_s_ideal.yaml --cn0 30:46:1 --trials 200 --freq-span 2000 --blocks 1 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_ideal.csv
-snappnt sweep scenarios/navic_s_esp32c61_4msps.yaml --cn0 30:46:1 --trials 200 --freq-span 40000 --blocks 1 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_esp32c61_4msps_b1.csv
-snappnt sweep scenarios/navic_s_esp32c61_4msps.yaml --cn0 30:46:1 --trials 200 --freq-span 40000 --blocks 4 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_esp32c61_4msps_b4.csv
+uv sync
+uv run snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 46:60:1 --trials 200 --freq-span 40000 --blocks 1 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_esp32c3.csv
+uv run snappnt sweep scenarios/navic_s_ideal.yaml --cn0 30:46:1 --trials 200 --freq-span 2000 --blocks 1 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_ideal.csv
+uv run snappnt sweep scenarios/navic_s_esp32c61_4msps.yaml --cn0 30:46:1 --trials 200 --freq-span 40000 --blocks 1 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_esp32c61_4msps_b1.csv
+uv run snappnt sweep scenarios/navic_s_esp32c61_4msps.yaml --cn0 30:46:1 --trials 200 --freq-span 40000 --blocks 4 --pfa 0.001 --seed 0 -o docs/results/pd_navic_s_esp32c61_4msps_b4.csv
 ```
 
 The plot and the table of 50 % and 90 % points:
 
 ```bash
-pip install -e ".[plot]"
-python tools/plot_pd_curves.py
+uv run --extra plot python tools/plot_pd_curves.py
 ```

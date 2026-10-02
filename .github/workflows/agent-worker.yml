@@ -66,14 +66,14 @@ jobs:
           ref: main
           fetch-depth: 0
           token: ${{ secrets.AGENT_GH_TOKEN }}
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.12"
-          cache: pip
+          enable-cache: true
       - name: Record start time
         run: echo "JOB_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
       - name: Install
-        run: python -m pip install -e ".[dev,docs]"
+        run: uv sync --locked
       - uses: anthropics/claude-code-action@12dd8d74c712f5f3669365b2369b558c495b1104 # v1.0.238
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

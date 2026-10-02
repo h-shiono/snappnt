@@ -22,20 +22,20 @@ simulator's truth automatically.
 ## Commands
 
 ```bash
-pip install -e ".[dev,docs]"     # add ",hw" to talk to hardware
-pytest -q                        # all tests
-pytest -m icd -q                 # spreading codes against values printed in ICDs
-pytest -m loopback -q            # simulate -> acquire -> compare with truth
-ruff check . && ruff format .    # lint and format
-mkdocs build --strict            # documentation site
-python tools/check_public_safety.py
-snappnt info
-snappnt sim scenarios/navic_s_esp32c3.yaml -o out/c3
-snappnt acquire out/c3 --prn 10 --freq-span 40000
-snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 48:60:2 --trials 20 -o out/pd.csv
+uv sync                          # dev and docs groups; add "--extra hw" to talk to hardware
+uv run pytest -q                        # all tests
+uv run pytest -m icd -q                 # spreading codes against values printed in ICDs
+uv run pytest -m loopback -q            # simulate -> acquire -> compare with truth
+uv run ruff check . && uv run ruff format .    # lint and format
+uv run mkdocs build --strict            # documentation site
+uv run python tools/check_public_safety.py
+uv run snappnt info
+uv run snappnt sim scenarios/navic_s_esp32c3.yaml -o out/c3
+uv run snappnt acquire out/c3 --prn 10 --freq-span 40000
+uv run snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 48:60:2 --trials 20 -o out/pd.csv
 ```
 
-Before finishing any change, all of these must pass: `ruff check .`, `ruff format --check .`,
+Before finishing any change, all of these must pass (run through `uv run`): `ruff check .`, `ruff format --check .`,
 `pytest -q`, `mkdocs build --strict`, `python tools/check_public_safety.py`.
 
 ## Layout (details in docs/design/architecture.md)

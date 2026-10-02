@@ -3,8 +3,7 @@
 Writes docs/results/pd-curves.png and prints the 50 % and 90 % points of each curve
 (linear interpolation between the two C/N0 grid points where Pd first reaches the level).
 
-    pip install -e ".[plot]"
-    python tools/plot_pd_curves.py
+    uv run --extra plot python tools/plot_pd_curves.py
 """
 
 from __future__ import annotations

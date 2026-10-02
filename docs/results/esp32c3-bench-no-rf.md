@@ -212,12 +212,12 @@ assumption; it is measured in #43, with a simulated DC offset from #42.
 ## Reproduce
 
 ```bash
-pip install -e ".[hw,plot]"
-snappnt capture <port> --freq-hz 2492e6 --bandwidth-mhz 62 --gain 60 --count 5 -o out/noise/g60
-snappnt capture <port> --freq-hz 2432e6 --bandwidth-mhz 62 --gain 60 --count 100 -o out/sign/lo2432
-snappnt capture <port> --freq-hz 2452e6 --bandwidth-mhz 62 --gain 60 --count 100 -o out/sign/lo2452
-python tools/plot_esp32_bench.py out/noise out/sign -o docs/results/esp32c3-bench-no-rf.png
-python tools/plot_esp32_bench.py out/noise --acquire-prn 10 --acquire-max 5
+uv sync --extra hw
+uv run snappnt capture <port> --freq-hz 2492e6 --bandwidth-mhz 62 --gain 60 --count 5 -o out/noise/g60
+uv run snappnt capture <port> --freq-hz 2432e6 --bandwidth-mhz 62 --gain 60 --count 100 -o out/sign/lo2432
+uv run snappnt capture <port> --freq-hz 2452e6 --bandwidth-mhz 62 --gain 60 --count 100 -o out/sign/lo2452
+uv run --extra plot python tools/plot_esp32_bench.py out/noise out/sign -o docs/results/esp32c3-bench-no-rf.png
+uv run --extra plot python tools/plot_esp32_bench.py out/noise --acquire-prn 10 --acquire-max 5
 ```
 
 The other rows of the table use `--gain 20`, `40`, `79` with `--count 5`, and `--gain auto`

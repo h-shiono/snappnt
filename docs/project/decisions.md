@@ -251,3 +251,21 @@ an earlier one and says so.
   capture per setting).
 - **Not measured:** real captures; drift within a capture (`linear` is tested only with a
   synthetic ramp).
+
+## D-018 Python environment is managed with uv (2026-10-02)
+
+- **Decision:** Development uses [uv](https://docs.astral.sh/uv/). `dev` and `docs` are
+  dependency groups (PEP 735) and `[tool.uv] default-groups` installs both with a plain
+  `uv sync`. `hw` and `plot` stay optional extras, because they are installed by users of the
+  package and not only by developers. `uv.lock` is one universal lock file for Python 3.11 and
+  newer and is committed. CI, the documentation deployment and the worker workflow install with
+  `uv sync --locked`, which fails when `uv.lock` is out of date. `.python-version` contains
+  `3.12`, the version the documentation job already used; the CI test job overrides it for
+  3.11, 3.12 and 3.13.
+- **Why:** The same dependency versions are used on every machine and in CI, so a result or a
+  failure can be reproduced.
+- **Consequence:** `pip install -e ".[dev]"` and `".[docs]"` no longer work, because those names
+  are not extras any more. `pip install -e ".[hw]"` still works. pip 25.1 or newer can install a
+  group with `pip install --group dev`.
+- **Not verified:** that `claude-code-action` finds `uv` on its PATH after the setup step; the
+  first worker run after the merge settles it.
