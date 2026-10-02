@@ -65,6 +65,7 @@ class AcqResult:
 
 
 DC_REMOVAL_MODES = ("none", "mean", "linear")
+_DC_CHUNK = 2**20  # samples per chunk of the linear fit
 
 
 def remove_dc_offset(x: np.ndarray, mode: str) -> np.ndarray:
@@ -82,11 +83,22 @@ def remove_dc_offset(x: np.ndarray, mode: str) -> np.ndarray:
         return x
     if mode == "mean" or x.size < 2:
         return x - np.complex64(np.mean(x, dtype=np.complex128))
-    n = np.arange(x.size, dtype=np.float64)
-    n -= n.mean()  # centred index: the slope fit is then independent of the mean
-    slope = (n @ x.astype(np.complex128)) / (n @ n)
-    fit = np.mean(x, dtype=np.complex128) + slope * n
-    return (x - fit).astype(np.complex64)
+    # Chunked sums keep the float64 temporaries at the size of one chunk, not of the snapshot.
+    # The index is centred, so the slope fit is independent of the mean.
+    centre = (x.size - 1) / 2.0
+    mean = np.mean(x, dtype=np.complex128)
+    num = 0j
+    for start in range(0, x.size, _DC_CHUNK):
+        stop = min(start + _DC_CHUNK, x.size)
+        n = np.arange(start, stop, dtype=np.float64) - centre
+        num += n @ x[start:stop].astype(np.complex128)
+    slope = num / (x.size * (x.size**2 - 1) / 12.0)  # sum of the squared centred index
+    out = np.empty_like(x)
+    for start in range(0, x.size, _DC_CHUNK):
+        stop = min(start + _DC_CHUNK, x.size)
+        n = np.arange(start, stop, dtype=np.float64) - centre
+        out[start:stop] = x[start:stop] - (mean + slope * n).astype(np.complex64)
+    return out
 
 
 def _replica(code: np.ndarray, chip_rate_hz: float, fs: float, n: int) -> np.ndarray:

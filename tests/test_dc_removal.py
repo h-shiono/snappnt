@@ -66,8 +66,9 @@ def test_without_removal_the_offset_lowers_the_metric(metrics):
 def test_noise_only_peak_moves_between_seeds_only_with_removal():
     """The DC offset puts the largest cell at the same code phase whatever the noise (the
     frequency alternates between two nearly equal bins); after removal the peak is a noise
-    peak whose code phase changes with the seed. Measured with seeds 0 to 11: about 179 chips
-    without removal in 11 of 12 seeds, and 12 different values with removal."""
+    peak whose code phase changes with the seed. Asserted for seeds 0 to 7 below; measured once
+    with seeds 0 to 11: about 179 chips without removal in 11 of 12 seeds, and 12 different
+    values with removal."""
     scn = load_scenario(SCENARIOS / "navic_s_esp32c3_dc.yaml")
     rx = replace(scn.receiver, spurs=())
     peaks = {"none": [], "mean": []}

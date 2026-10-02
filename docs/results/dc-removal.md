@@ -65,9 +65,12 @@ below about 0.2 dB are not significant.
 - **`linear` is not different from `mean` here** (0.02 dB at the 50 % point), as expected,
   because the simulated offset is constant. The benefit of `linear` is checked only with a
   synthetic ramp in `tests/test_dc_removal.py`.
-- The noise-only test in the same file shows the effect on the largest cell: without removal
-  it is at about 179 chips of code phase in 11 of 12 seeds; with `mean` the 12 seeds give 12
-  different values.
+- The noise-only test in the same file shows the effect on the largest cell. It runs seeds 0
+  to 7 and asserts that without removal the largest cell is within 3 chips of 179.2 chips of
+  code phase in at least 6 of the 8 seeds, and that with `mean` it is there in at most 1 of
+  the 8. Measured (a one-time run, not enforced by the test): without removal 7 of 8 seeds
+  (seed 3 is at 78 chips); over seeds 0 to 11, 11 of 12 without removal, and with `mean` the
+  12 seeds gave 12 different code phases.
 
 Data files (columns `cn0_dbhz`, `trials`, `p_detect`, `p_wrong`, `mean_metric`):
 
