@@ -1,0 +1,24 @@
+# navic_s_esp32c3 with the receiver effects measured on one XIAO ESP32C3 board without an RF
+# source (docs/results/esp32c3-bench-no-rf.md). Both values are from one board and one
+# bench session; another board or gain setting gives different numbers.
+name: navic_s_esp32c3_dc
+signal: navic_s_sps
+seed: 2
+receiver:
+  device: esp32c3
+  baseband_offset_hz: 0
+  clock_offset_ppm: 12.0
+  agc_backoff_db: 12
+  # Measured on one board: mean of I about -270 counts at gain index 79 (about -0.5 of the
+  # 512-count full scale), Q within +-25 counts (taken as 0). The drift of about 25 counts
+  # within one capture is not modelled.
+  dc_offset: {i: -0.5, q: 0.0}
+  spurs:
+    # Measured on one board: line at 2480 MHz, -12 MHz from 2492 MHz, 16 dB above the local
+    # floor at gain index 60 with 62 MHz bandwidth (1024-point Hann PSD, tone at a bin centre).
+    # Converted to the key's definition (tone power / total noise power per sample) as an
+    # estimate: a Hann-windowed tone peak stands 10*log10(2*1024/3) = 28.3 dB above the
+    # per-bin noise for power ratio 1, so 16 - 28.3 = -12.3 dB, rounded to -12.
+    - {offset_hz: -12000000, power_db: -12}
+satellites:
+  - {prn: 10, cn0_dbhz: 58, doppler_hz: 0, code_phase_chips: 800.25}

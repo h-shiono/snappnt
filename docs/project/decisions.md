@@ -212,3 +212,25 @@ an earlier one and says so.
   into snappnt (would put snappnt under the GPL; rejected).
 - **Not a legal opinion:** the licence reasoning is to be checked again before publication
   (#12).
+
+## D-016 DC offset and fixed spurs in the simulated receiver (2026-10-02)
+
+- **Decision:** Scenarios may set `receiver.dc_offset` (fraction of ADC full scale per
+  component) and `receiver.spurs` (baseband offset in Hz and power in dB). The DC offset is
+  applied by a new function `quantize_with_offset`; `quantize` is unchanged. A spur's power is
+  the tone power divided by the total noise power per sample at the generation rate. The DC
+  offset is constant over a snapshot. Spur phases are drawn from a second random generator
+  seeded from the scenario seed.
+- **Why:** Noise-only captures from one ESP32-C3 board (see
+  [ESP32-C3 bench checks](../results/esp32c3-bench-no-rf.md)) show a DC offset of about half
+  of full scale on I and fixed narrow lines. The offset must be added after the gain of the
+  automatic gain control is set: if it is added before, the gain would include it in the RMS,
+  and at the default 12 dB back-off (RMS of 0.25 of full scale per component) an offset of
+  −0.5 of full scale cannot be reached. A second random generator keeps the noise and data
+  symbols of existing scenarios, and of scenarios with spurs, identical.
+- **Alternatives:** Adding the offset in input units before `quantize` (cannot reach the
+  requested fraction). Changing the signature of `quantize` (a public function). Defining the
+  spur level as height above the noise floor in a spectrum (depends on the FFT length).
+- **Not modelled:** drift of the DC offset within one capture (about 25 counts in 205 µs on
+  the board measured). The values in `scenarios/navic_s_esp32c3_dc.yaml` come from one board
+  and one bench session.
