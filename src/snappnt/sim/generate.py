@@ -21,6 +21,13 @@ noise are created at that rate (noise density still 1 / generate rate), low-pass
 sample, so noise from the whole analog bandwidth folds into the output band; method ``ideal``
 low-pass filters to the output band first. Without these keys the samples are created
 directly at ``sample_rate_hz``.
+
+Optional receiver impairments (order in ``sim/impairments.py``): fixed spurs, tones at a
+baseband offset from the tuned frequency whose power is given relative to the total noise
+power per sample (amplitude ``10^(power_db / 20)``), added at the generation rate before the
+analog low-pass; and a DC offset per component as a fraction of ADC full scale, added in the
+quantiser. Spur phases come from a separate random generator derived from the scenario seed, so
+the draws of the main generator (noise, data symbols) do not change when spurs are set.
 """
 
 from __future__ import annotations
@@ -31,7 +38,13 @@ import numpy as np
 
 from snappnt.frontend.freqplan import FrequencyPlan
 from snappnt.signals import get_code, load_signal
-from snappnt.sim.impairments import decimate_without_filter, lowpass, quantize
+from snappnt.sim.impairments import (
+    add_spurs,
+    decimate_without_filter,
+    lowpass,
+    quantize,
+    quantize_with_offset,
+)
 from snappnt.sim.scenario import Scenario
 
 
@@ -111,6 +124,9 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
             }
         )
 
+    if rx.spurs:
+        x = add_spurs(x, fs_gen, rx.spurs, np.random.default_rng([scn.seed, 1]))
+
     if rx.generate_rate_hz is not None:
         if rx.analog_bandwidth_hz is not None:
             x = lowpass(x, fs_gen, rx.analog_bandwidth_hz)
@@ -118,8 +134,13 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
             x = lowpass(x, fs_gen, fs_nominal)
         x = decimate_without_filter(x, rx.decimation_factor)
 
+    has_dc = rx.dc_offset_i is not None or rx.dc_offset_q is not None
+    dc_i, dc_q = rx.dc_offset_i or 0.0, rx.dc_offset_q or 0.0  # an omitted component is zero
     if rx.quantization_bits is not None:
-        x = quantize(x, rx.quantization_bits, rx.agc_backoff_db)
+        if has_dc:
+            x = quantize_with_offset(x, rx.quantization_bits, rx.agc_backoff_db, (dc_i, dc_q))
+        else:
+            x = quantize(x, rx.quantization_bits, rx.agc_backoff_db)
 
     truth = {
         "scenario": scn.name,
@@ -154,6 +175,8 @@ def generate(scn: Scenario) -> tuple[np.ndarray, dict[str, Any]]:
             if rx.generate_rate_hz is not None
             else {}
         ),
+        **({"dc_offset_fullscale": {"i": dc_i, "q": dc_q}} if has_dc else {}),
+        **({"spurs": [{"offset_hz": f, "power_db": p} for f, p in rx.spurs]} if rx.spurs else {}),
         "satellites": truth_sats,
     }
     return x.astype(np.complex64), truth

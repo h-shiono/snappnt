@@ -17,6 +17,11 @@ Scenarios are YAML files (see ``scenarios/``). Example::
       generate_rate_hz: 80000000
       analog_bandwidth_hz: 13000000   # default: first (lower) value of the device YAML
       decimation: {factor: 20, method: none}   # none = keep every n-th sample, ideal = filter first
+      # Optional: DC offset (fraction of ADC full scale, needs quantization_bits) and fixed spurs
+      # (offset from the tuned frequency; power = tone power / total noise power per sample)
+      dc_offset: {i: -0.5, q: 0.0}
+      spurs:
+        - {offset_hz: -12000000, power_db: -12}
     satellites:
       - {prn: 1, cn0_dbhz: 55, doppler_hz: 0, code_phase_chips: 123.4}
 
@@ -77,6 +82,17 @@ class ReceiverConfig:
     decimation_factor: int | None = None
     decimation_method: str | None = None
     analog_bandwidth_hz: float | None = None
+    # Fraction of ADC full scale, added before rounding. None means dc_offset is not set;
+    # an explicit zero is kept so that the truth records it.
+    dc_offset_i: float | None = None
+    dc_offset_q: float | None = None
+    spurs: tuple[tuple[float, float], ...] = ()  # (baseband offset_hz, power_db re noise power)
+
+    def __post_init__(self) -> None:
+        # The offset is applied in the quantization step, so it needs quantization_bits.
+        has_dc = self.dc_offset_i is not None or self.dc_offset_q is not None
+        if has_dc and self.quantization_bits is None:
+            raise ValueError("receiver.dc_offset needs quantization_bits")
 
 
 @dataclass(frozen=True)
@@ -122,6 +138,32 @@ def _decimation_from_dict(
     return float(generate_rate), factor, method
 
 
+def _dc_and_spurs_from_dict(
+    d: dict[str, Any], sample_rate_hz: float, generate_rate_hz: float | None
+) -> tuple[float | None, float | None, tuple[tuple[float, float], ...]]:
+    dc = d.get("dc_offset")
+    dc_i: float | None = None
+    dc_q: float | None = None
+    if dc is not None:
+        dc_i, dc_q = float(dc.get("i", 0.0)), float(dc.get("q", 0.0))
+        for name, value in (("i", dc_i), ("q", dc_q)):
+            if not -1.0 <= value < 1.0:  # false for NaN as well
+                raise ValueError(f"dc_offset.{name} must be in [-1, 1), not {value}")
+    nyquist_hz = (generate_rate_hz or sample_rate_hz) / 2.0
+    spurs = []
+    for spur in d.get("spurs") or []:
+        offset_hz, power_db = float(spur["offset_hz"]), float(spur["power_db"])
+        if not np.isfinite(power_db):
+            raise ValueError(f"spur power_db must be a finite number, not {power_db}")
+        if not abs(offset_hz) < nyquist_hz:  # true for NaN as well
+            raise ValueError(
+                f"spur offset_hz ({offset_hz}) must be inside +-{nyquist_hz} Hz "
+                "(half the rate at which samples are generated)"
+            )
+        spurs.append((offset_hz, power_db))
+    return dc_i, dc_q, tuple(spurs)
+
+
 def _receiver_from_dict(d: dict[str, Any]) -> ReceiverConfig:
     d = dict(d)
     device = d.get("device")
@@ -144,6 +186,7 @@ def _receiver_from_dict(d: dict[str, Any]) -> ReceiverConfig:
     bandwidth = d.get("analog_bandwidth_hz")
     if bandwidth is not None and float(bandwidth) <= 0:
         raise ValueError(f"analog_bandwidth_hz must be positive, not {bandwidth}")
+    dc_i, dc_q, spurs = _dc_and_spurs_from_dict(d, sample_rate_hz, generate_rate_hz)
     return ReceiverConfig(
         sample_rate_hz=sample_rate_hz,
         n_samples=int(d["n_samples"]),
@@ -159,6 +202,9 @@ def _receiver_from_dict(d: dict[str, Any]) -> ReceiverConfig:
         decimation_factor=factor,
         decimation_method=method,
         analog_bandwidth_hz=None if bandwidth is None else float(bandwidth),
+        dc_offset_i=dc_i,
+        dc_offset_q=dc_q,
+        spurs=spurs,
     )
 
 

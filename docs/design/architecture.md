@@ -49,6 +49,26 @@ then mirrors the Doppler shift for a high-side LO, applies the external LO error
 (`lo_offset_ppm`) separately from the receiver crystal error, and takes `baseband_offset_hz`
 from the plan, so acquisition needs no other input. See decision D-013.
 
+### Receiver impairments in the simulator
+
+Optional keys under `receiver` in a scenario YAML; without them the output of a scenario is
+unchanged (a test compares the samples of every scenario in `scenarios/` with stored hashes).
+
+| Key | Meaning |
+|---|---|
+| `dc_offset: {i, q}` | Constant offset of each component as a fraction of ADC full scale (−0.5 on I with 10 bits is −256 counts). Each value must be in [−1, 1). Needs `quantization_bits`. |
+| `spurs: [{offset_hz, power_db}]` | Fixed tones. `offset_hz` is the offset from the tuned frequency in the samples, and must be inside ±half of the rate at which samples are generated. `power_db` is the tone power divided by the total noise power per sample at the generation rate (noise has unit variance); it is not the height above the noise floor in a spectrum, where a tone of power ratio 1 stands `10·log10(N)` dB above the floor of one bin in an N-point spectrum. |
+
+Processing order: signal and noise at the generation rate, then spurs, analog low-pass,
+output-band low-pass (decimation method `ideal`), decimation, and the ADC. With a generation rate
+(`generate_rate_hz`), a spur outside the analog bandwidth is removed; without one, the analog
+bandwidth has no effect and the spur stays. A spur outside the output band folds to an aliased frequency when
+the decimation method is `none`. The DC offset is added in the ADC after the gain of the
+automatic gain control (AGC) is set from the signal alone, so the offset is not part of the
+level the AGC holds. The offset is constant over a snapshot; the drift of about 25 counts
+within one 205 µs capture seen on an ESP32-C3 is not modelled. Spur phases come from a random
+generator separate from the one for noise and data symbols. See decision D-016.
+
 ### 3. Data format (`io`)
 
 Recordings use SigMF: a raw sample file plus a JSON metadata file. The simulator's truth is
