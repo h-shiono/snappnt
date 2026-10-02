@@ -234,3 +234,20 @@ an earlier one and says so.
 - **Not modelled:** drift of the DC offset within one capture (about 25 counts in 205 µs on
   the board measured). The values in `scenarios/navic_s_esp32c3_dc.yaml` come from one board
   and one bench session.
+
+## D-017 DC offset removal is an option of acquisition, default off (2026-10-02)
+
+- **Decision:** `acquire` takes `remove_dc` (`none`, `mean` or `linear`), and `snappnt acquire`
+  and `snappnt sweep` take `--remove-dc`. The default is `none`, so existing results do not
+  change. The maintainer approved this default on issue #43.
+- **Why:** In the simulated ESP32-C3 case with a DC offset of −0.5 of full scale, acquisition
+  without removal never detects up to 60 dB-Hz. With mean removal the 50 % point is 50.38 dB-Hz
+  against 50.29 dB-Hz without an offset, a loss of 0.09 dB. Mean removal on a snapshot with no
+  offset costs 0.08 dB at the 50 % point and 0.10 dB at the 90 % point (200 trials per point,
+  uncertainty about ±0.2 dB). See [DC offset removal](../results/dc-removal.md). The default
+  can be revisited from these numbers once real captures have been checked.
+- **Alternatives:** Removal on by default (changes the result of an existing command; left to
+  the maintainer). Estimating the offset from a separate noise-only capture (needs a second
+  capture per setting).
+- **Not measured:** real captures; drift within a capture (`linear` is tested only with a
+  synthetic ramp).
