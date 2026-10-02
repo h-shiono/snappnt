@@ -203,7 +203,8 @@ an earlier one and says so.
 - **Why:** snappnt is a separate program that talks to the firmware over a serial link, so
   the GPL does not extend to it and snappnt stays BSD-2-Clause (D-002). Describing the
   protocol in our own words and citing firmware file and line, as
-  `docs/design/espsdr-protocol.md` and `docs/design/esp32c61-capture.md` do, is not copying.
+  [ESP-SDR protocol](../design/espsdr-protocol.md) and
+  [ESP32-C61 capture](../design/esp32c61-capture.md) do, is not copying.
   Nothing in M3 needs a firmware change, and a fork would have to be maintained.
   #13 found that continuous capture on the C61 would need firmware changes, which is when
   this decision is revisited.
