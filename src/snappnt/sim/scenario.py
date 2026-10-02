@@ -88,6 +88,12 @@ class ReceiverConfig:
     dc_offset_q: float | None = None
     spurs: tuple[tuple[float, float], ...] = ()  # (baseband offset_hz, power_db re noise power)
 
+    def __post_init__(self) -> None:
+        # The offset is applied in the quantization step, so it needs quantization_bits.
+        has_dc = self.dc_offset_i is not None or self.dc_offset_q is not None
+        if has_dc and self.quantization_bits is None:
+            raise ValueError("receiver.dc_offset needs quantization_bits")
+
 
 @dataclass(frozen=True)
 class Scenario:
@@ -143,8 +149,6 @@ def _dc_and_spurs_from_dict(
         for name, value in (("i", dc_i), ("q", dc_q)):
             if not -1.0 <= value < 1.0:  # false for NaN as well
                 raise ValueError(f"dc_offset.{name} must be in [-1, 1), not {value}")
-        if d.get("quantization_bits") is None:
-            raise ValueError("receiver.dc_offset needs quantization_bits")
     nyquist_hz = (generate_rate_hz or sample_rate_hz) / 2.0
     spurs = []
     for spur in d.get("spurs") or []:

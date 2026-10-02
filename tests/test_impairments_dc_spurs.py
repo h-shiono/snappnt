@@ -202,3 +202,13 @@ def test_new_keys_are_documented():
     text = ARCHITECTURE.read_text(encoding="utf-8")
     for key in ("dc_offset", "spurs", "offset_hz", "power_db"):
         assert key in text
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"dc_offset_i": 0.25}, {"dc_offset_q": -0.25}, {"dc_offset_i": 0.0, "dc_offset_q": 0.0}],
+)
+def test_code_built_dc_offset_without_quantization_is_rejected(kwargs):
+    scn = scenario_from_dict(_noise_scenario())
+    with pytest.raises(ValueError, match="quantization_bits"):
+        replace(scn.receiver, quantization_bits=None, **kwargs)
