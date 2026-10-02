@@ -25,7 +25,7 @@ snappnt sim scenarios/navic_s_esp32c3.yaml -o out/c3
 snappnt acquire out/c3 --prn 10 --freq-span 40000
 ```
 
-The scenario models a Seeed XIAO ESP32C3: 80 MSa/s, 16384 samples (about 0.2 ms),
+The scenario models a Seeed XIAO ESP32C3: 80 MSa/s, 16380 samples (about 0.2 ms),
 a 10-bit ADC and a receiver crystal error of 12 ppm (about −30 kHz at 2492 MHz).
 
 `sim` writes a [SigMF](https://sigmf.org) recording: `out/c3.sigmf-data` holds the samples and

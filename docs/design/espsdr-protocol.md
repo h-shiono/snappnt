@@ -4,8 +4,13 @@ This page describes how a host program talks to the ESP-SDR firmware over a seri
 as read from the firmware and browser-client sources. It is the basis for
 `src/snappnt/io/espsdr_client.py` and `src/snappnt/io/espsdr_capture.py`.
 
-**Status: read from source only. Nothing on this page has been verified on hardware.**
-Hardware verification is tracked in issue #11.
+**Status: read from source.** On an ESP32-C3 (Seeed XIAO ESP32C3), the following were checked
+on hardware in [ESP32-C3 bench checks without an RF source](../results/esp32c3-bench-no-rf.md)
+(issue #41): the replies to `INFO`, `CAPS`, `LIMITS?`, `RANGE?`, `TRANSPORT?`, `GAIN?` and
+`FREQ 2492`; the maximum of 16380 samples per capture (16381 is rejected); the `CAP20` header,
+payload length and CRC-32; and the sign of frequency (the spectrum is not mirrored). Everything
+else on this page, and every other chip, has not been verified on hardware. Further hardware
+verification is tracked in issue #11.
 
 ## Sources and how to read the citations
 
@@ -66,7 +71,7 @@ does not parse, or whose numbers are out of range, is answered with `ERR command
 | Command | Reply | Meaning | Source |
 |---|---|---|---|
 | `INFO` | `C3SDR 6 burst 16380` | Chip family, protocol number 6, maximum samples per capture | `receiver.c:188` |
-| `CAPS` | `CAPS UARTBAUD RXLIMITS SERIALLEASE [DUALSERIAL] TUNEEXT LPFANA GAIN HWAGC IQ8` | Capability words | `receiver.c:168-174` |
+| `CAPS` | `CAPS UARTBAUD RXLIMITS SERIALLEASE [DUALSERIAL] TUNEEXT LPFANA GAIN HWAGC IQ8` | Capability words (newer firmware adds `SPEC SPECN SPECCAPS SPECSTAT DCT` at the start; see below the table) | `receiver.c:168-174` |
 | `LIMITS?` | `LIMITS {"gain":[0,<max>,1],"bandwidth":[14,62,1,0],"rates":[80000000],"bits":[8,10]}` | Receive limits as JSON | `main/common/burst_limits.h:4-32` |
 | `RANGE?` | `RANGE 100 6000 1` | Tuning range in MHz and step | `receiver.c:185-187`, `main/common/rx_tuning.h:5-7` |
 | `TRANSPORT?` | `TRANSPORT USB 0` or `TRANSPORT UART <baud>` | Active interface | `receiver.c:146-151` |
@@ -86,6 +91,17 @@ snappnt. In the C3 receiver source and the shared files, no command transmits: t
 transmit-related calls turn transmission off while preparing reception
 (`receiver.c:72-74`). The firmware README says the same (`fw` `README.md:21-22`). snappnt
 therefore implements no transmit command.
+
+Newer firmware adds on-chip spectrum commands. At commit
+`550fadea4d00a9e26ce921c5832167becb3dc20c` (2026-10-01) the C3 receiver answers `CAPS` with
+`CAPS SPEC SPECN SPECCAPS SPECSTAT DCT UARTBAUD ...` (`main/targets/esp32c3/receiver.c:217`)
+and passes each command line to the spectrum and ring-capture handlers before the commands
+in the table above (`receiver.c:189`, `:193`). These commands were not read for this page and
+are not used by snappnt. The capture path that `CAP16` and `CAP20` use was only moved into a
+separate function between `4935ac2` and `550fade`; the `DATA` header format is the same
+(`receiver.c:151-159` at `550fade`). The ESP32-C3 firmware
+checked on hardware answered `CAPS` with these words
+([ESP32-C3 bench checks](../results/esp32c3-bench-no-rf.md)).
 
 ## Setting the frequency
 
@@ -182,7 +198,8 @@ followed immediately by the payload (`receiver.c:141-142`).
   (`web` `radio.js:3-4`) and compares it with this field (`web` `radio.js:178`), so
   `zlib.crc32` of the payload is the expected value. That the firmware routine
   `esp_rom_crc32_le(0, ...)` is the same CRC is inferred from the browser client working
-  against it; it has not been checked against the ROM.
+  against it. On an ESP32-C3, `zlib.crc32` of the payload matched the header in every `CAP20`
+capture of [ESP32-C3 bench checks](../results/esp32c3-bench-no-rf.md) (more than 300).
 - `<capture-microseconds>` is the time the firmware measured around the capture, including
   setup of the capture hardware (`receiver.c:116`, `:127`). It is not the sample duration.
 
@@ -225,8 +242,10 @@ I and the high 10-bit field as Q, and then **negates Q** before display
 field as I and the low field as Q, so its result is `high + j·low`, which equals
 `j · (low − j·high)`: the browser client's signal multiplied by the constant `j`. A constant
 factor changes only the carrier phase, which neither acquisition nor the CRC depends on, and
-it does not change the sign of frequency. snappnt keeps its existing convention. The sign of
-frequency offsets (spectrum not mirrored) has not been checked on hardware (issue #11).
+it does not change the sign of frequency. snappnt keeps its existing convention. On an
+ESP32-C3 the spectrum from `unpack_words` is not mirrored: a positive baseband frequency is a
+radio frequency above the tuned frequency
+([ESP32-C3 bench checks](../results/esp32c3-bench-no-rf.md), "Sign of frequency").
 
 ### Maximum samples per capture
 

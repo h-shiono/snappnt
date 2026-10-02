@@ -12,5 +12,6 @@ Recorded pages:
 | [Noise-folding loss at low sample rates](aliasing-loss.md) | #3 |
 | [Bias of the C/N0 estimate](cn0-bias.md) | #4 |
 | [LEO Doppler rate and the Doppler-rate search](leo-doppler-rate.md) | #16 |
+| [ESP32-C3 bench checks without an RF source](esp32c3-bench-no-rf.md) | #41 |
 
 When adding a page, also add it to the `nav` section of `mkdocs.yml`.
