@@ -56,7 +56,8 @@ class Group:
 
     @property
     def label(self) -> str:
-        return f"{self.frequency_hz / 1e6:g} MHz, {self.gain}, bandwidth {self.bandwidth}"
+        freq_mhz = self.frequency_hz / 1e6
+        return f"{self.source}: {freq_mhz:g} MHz, {self.gain}, bandwidth {self.bandwidth}"
 
 
 def group_key(source: str, meta: dict) -> tuple[str, float, str, str]:
@@ -120,10 +121,22 @@ def find_lines(psd_db: np.ndarray) -> list[tuple[int, float]]:
 
 
 def load_groups(dirs: list[Path]) -> list[Group]:
-    groups: dict[tuple[str, float, str, str], Group] = {}
+    """Group the captures of each directory. A directory is named by its last component only,
+    so that no machine-specific path reaches the printed tables or the figure; two different
+    directories with the same name are therefore refused rather than merged."""
+    seen: dict[str, Path] = {}
     for d in dirs:
+        if seen.setdefault(d.name, d.resolve()) != d.resolve():
+            raise SystemExit(f"two different directories are both named {d.name!r}; rename one")
+    groups: dict[tuple[str, float, str, str], Group] = {}
+    for d in dict.fromkeys(dirs):
         for meta_path in sorted(d.glob("*.sigmf-meta")):
             x, meta = read_sigmf(meta_path)
+            if x.size < FFT_SIZE:
+                raise SystemExit(
+                    f"{meta_path.name}: {x.size} samples, fewer than the {FFT_SIZE} needed for one "
+                    "PSD segment; leave such captures out"
+                )
             key = group_key(d.name, meta)
             g = groups.setdefault(key, Group(*key))
             g.sample_rate_hz = float(meta["global"]["core:sample_rate"])
@@ -278,24 +291,28 @@ def plot(groups: list[Group], pairs: list[tuple[Group, Group]], out: Path) -> No
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    # Groups that belong to a frequency pair are drawn in that pair's panel; the others share
+    # the first panel. Every group therefore appears exactly once or in each of its pairs.
     single = [g for g in groups if not any(g in p for p in pairs)]
-    n_panels = 1 + len(pairs[:1])
+    n_panels = (1 if single else 0) + len(pairs)
     fig, axes = plt.subplots(n_panels, 1, figsize=(9, 4.4 * n_panels), facecolor=SURFACE)
-    axes = np.atleast_1d(axes)
-    ax = axes[0]
-    for c, g in zip(COLOURS, single, strict=False):
-        ax.plot(offsets_hz(g.sample_rate_hz) / 1e6, median_psd_db(g), color=c, lw=0.9,
-                label=f"{g.gain}, bandwidth {g.bandwidth} ({len(g.psds)} captures)")  # fmt: skip
-    freqs = sorted({g.frequency_hz for g in single})
-    tuned = ", ".join(f"{f / 1e6:g}" for f in freqs)
-    ax.set_title(f"Median PSD, tuned to {tuned} MHz, no RF source", color=INK, fontsize=10)
-    ax.set_xlabel("Offset from tuned frequency (MHz)", color=INK_MUTED, fontsize=9)
-    ax.set_ylabel("PSD (dB, 10-bit scale, arbitrary)", color=INK_MUTED, fontsize=9)
-    ax.legend(fontsize=7, frameon=False, ncol=2, loc="upper center", bbox_to_anchor=(0.5, -0.2))
-    style(ax)
-    if pairs:
-        a, b = pairs[0]
-        ax = axes[1]
+    axes = list(np.atleast_1d(axes))
+    if single:
+        ax = axes.pop(0)
+        sources = {g.source for g in single}
+        for c, g in zip(COLOURS * (len(single) // len(COLOURS) + 1), single, strict=False):
+            name = f"{g.source}: " if len(sources) > 1 else ""
+            label = f"{name}{g.gain}, bandwidth {g.bandwidth} ({len(g.psds)} captures)"
+            ax.plot(offsets_hz(g.sample_rate_hz) / 1e6, median_psd_db(g), color=c, lw=0.9,
+                    label=label)  # fmt: skip
+        freqs = sorted({g.frequency_hz for g in single})
+        tuned = ", ".join(f"{f / 1e6:g}" for f in freqs)
+        ax.set_title(f"Median PSD, tuned to {tuned} MHz, no RF source", color=INK, fontsize=10)
+        ax.set_xlabel("Offset from tuned frequency (MHz)", color=INK_MUTED, fontsize=9)
+        ax.set_ylabel("PSD (dB, 10-bit scale, arbitrary)", color=INK_MUTED, fontsize=9)
+        ax.legend(fontsize=7, frameon=False, ncol=2, loc="upper center", bbox_to_anchor=(0.5, -0.2))
+        style(ax)
+    for (a, b), ax in zip(pairs, axes, strict=True):
         for c, g in zip(COLOURS, (a, b), strict=False):
             rf_mhz = (g.frequency_hz + offsets_hz(g.sample_rate_hz)) / 1e6
             label = f"tuned to {g.frequency_hz / 1e6:g} MHz ({len(g.psds)} captures)"
@@ -329,9 +346,8 @@ def main() -> None:
     for pa, pb in pairs:
         print_sign_check(pa, pb)
     if a.acquire_prn is not None:
-        single = [g for g in groups if not any(g in pr for pr in pairs)]
         print_acquisition(
-            single,
+            groups,
             a.acquire_prn,
             a.acquire_center_hz,
             a.acquire_span_hz,

@@ -262,10 +262,11 @@ The number in the `INFO` reply is the maximum; the client reads it and may not a
 
 The minimum is 256 samples on every chip (`receiver.c:193`, `esp32/receiver.c:163`).
 The browser client accepts an `INFO` maximum from 4096 to 16384
-(`web` `radio.js:109`). The C3 value 16380 is below the 16384 that
-`max_capture_samples` in `esp32c3.yaml` assumes: 16380 words of 4 bytes fit in the 64 KiB
-bank at `0x3fcb0000` (`receiver.c:21-26`). The yaml file is outside the scope of the
-issue that produced this page and is left unchanged.
+(`web` `radio.js:109`). The C3 value is 16380, not 16384: 16380 words of 4 bytes fit in the
+64 KiB bank at `0x3fcb0000` (`receiver.c:21-26`). On an ESP32-C3 the firmware accepted 16380
+samples and answered `ERR command` to 16381
+([ESP32-C3 bench checks](../results/esp32c3-bench-no-rf.md)), and `max_capture_samples` in
+`src/snappnt/frontend/devices/esp32c3.yaml` is 16380.
 
 At 80 MS/s, 16380 samples last 204.75 µs, equal to about 0.2 of one NavIC code period of
 1 ms. The firmware's own comment gives "about 205 µs" (`receiver.c:112-113`).
