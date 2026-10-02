@@ -6,6 +6,6 @@ tune_range_hz: [2100000000, 2800000000]   # "tuning attempts"; PLL lock not guar
 sample_rates_sps: [80000000]
 adc_bits: 10
 analog_bandwidth_hz: [14000000, 62000000]
-max_capture_samples: 16384   # TODO: measure. Assumes one 64 KiB bank of 32-bit words (as on C61).
+max_capture_samples: 16380   # measured: INFO reports 16380, CAP20 16381 -> ERR command (docs/results/esp32c3-bench-no-rf.md)
 transport: "USB Serial/JTAG (native)"
 source: "ESPARGOS esp-sdr README and docs/rx-controls.md (2026-09)"
