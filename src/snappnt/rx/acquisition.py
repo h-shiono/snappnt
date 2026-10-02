@@ -64,6 +64,31 @@ class AcqResult:
     rate_step_hzps: float = 0.0  # 0 when a single rate hypothesis was used
 
 
+DC_REMOVAL_MODES = ("none", "mean", "linear")
+
+
+def remove_dc_offset(x: np.ndarray, mode: str) -> np.ndarray:
+    """Subtract a DC offset from a complex snapshot, estimated from the snapshot itself.
+
+    ``"none"`` returns ``x`` unchanged. ``"mean"`` subtracts the complex mean. ``"linear"``
+    subtracts a straight line fitted by least squares to I and Q separately against the sample
+    index, which also removes a steady drift of the offset within the snapshot. The result is
+    complex64.
+    """
+    if mode not in DC_REMOVAL_MODES:
+        raise ValueError(f"remove_dc must be one of {DC_REMOVAL_MODES}, got {mode!r}")
+    x = np.asarray(x, dtype=np.complex64)
+    if mode == "none" or x.size == 0:
+        return x
+    if mode == "mean" or x.size < 2:
+        return x - np.complex64(np.mean(x, dtype=np.complex128))
+    n = np.arange(x.size, dtype=np.float64)
+    n -= n.mean()  # centred index: the slope fit is then independent of the mean
+    slope = (n @ x.astype(np.complex128)) / (n @ n)
+    fit = np.mean(x, dtype=np.complex128) + slope * n
+    return (x - fit).astype(np.complex64)
+
+
 def _replica(code: np.ndarray, chip_rate_hz: float, fs: float, n: int) -> np.ndarray:
     idx = np.floor(np.arange(n) * chip_rate_hz / fs).astype(np.int64) % code.size
     return code[idx].astype(np.float32)
@@ -186,6 +211,7 @@ def acquire(
     refine: bool = False,
     rate_range_hzps: tuple[float, float] | None = None,
     rate_step_hzps: float | None = None,
+    remove_dc: str = "none",
 ) -> AcqResult:
     """Search one PRN.
 
@@ -202,8 +228,12 @@ def acquire(
     with ``n_blocks > 1`` it is reduced as described in ``_rate_grid``. Hypotheses stay within
     the range, both ends included. A reversed range or a step that is not positive raises
     ``ValueError``.
+
+    ``remove_dc`` (``"none"``, ``"mean"`` or ``"linear"``) subtracts an estimate of the receiver's
+    DC offset from the snapshot before correlation; see ``remove_dc_offset``. The default
+    ``"none"`` leaves the snapshot as it is. Any other value raises ``ValueError``.
     """
-    x = np.asarray(x, dtype=np.complex64)
+    x = remove_dc_offset(x, remove_dc)
     n = x.size
     k = int(np.ceil(spec.code_period_s * fs))  # lags to test
     block = n // n_blocks
