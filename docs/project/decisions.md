@@ -191,3 +191,24 @@ an earlier one and says so.
   metadata when the data rename fails, which is the same mismatch in the other direction.
   Refusing `--overwrite` when the metadata file cannot be replaced is a check made in advance,
   and it does not cover a failure between the two renames.
+
+## D-015 ESP-SDR firmware is used unmodified; no fork for now (2026-10-02)
+
+- **Decision:** M3 uses the ESP-SDR firmware (`ESPARGOS/esp-sdr`, GPL-3.0) as published,
+  without changes. If M4 (long captures on the ESP32-C61) needs firmware changes, they are
+  first proposed upstream. Only if upstream does not take them is the firmware forked, in a
+  separate repository that stays under GPL-3.0, with source published alongside any binaries.
+  No firmware code is copied into snappnt, and firmware functions are not translated into
+  Python; snappnt implements the protocol and data formats from their description.
+- **Why:** snappnt is a separate program that talks to the firmware over a serial link, so
+  the GPL does not extend to it and snappnt stays BSD-2-Clause (D-002). Describing the
+  protocol in our own words and citing firmware file and line, as
+  [ESP-SDR protocol](../design/espsdr-protocol.md) and
+  [ESP32-C61 capture](../design/esp32c61-capture.md) do, is not copying.
+  Nothing in M3 needs a firmware change, and a fork would have to be maintained.
+  #13 found that continuous capture on the C61 would need firmware changes, which is when
+  this decision is revisited.
+- **Alternatives:** Forking now (maintenance without a present need). Bringing firmware code
+  into snappnt (would put snappnt under the GPL; rejected).
+- **Not a legal opinion:** the licence reasoning is to be checked again before publication
+  (#12).
