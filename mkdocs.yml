@@ -59,6 +59,7 @@ nav:
   - Guides:
       - Conducted test: guides/conducted-test.md
       - Conducted test log template: guides/conducted-test-log-template.md
+      - Sky test plan: guides/sky-test-plan.md
   - Results:
       - results/index.md
       - False-alarm rate: results/false-alarm.md
