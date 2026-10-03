@@ -272,13 +272,16 @@ an earlier one and says so.
 
 ## D-019 `snappnt capture` records the firmware's low-pass code, not an estimated bandwidth (2026-10-03)
 
-- **Decision:** `snappnt capture` sends `LPF?` once before the first capture and records the
-  reply in each recording as `snappnt:espsdr_lpf_reply`, with the parsed capacitor code
+- **Decision:** `snappnt capture` sends `LPF?` immediately before every capture and records
+  the reply in that recording as `snappnt:espsdr_lpf_reply`, with the parsed capacitor code
   (`snappnt:espsdr_lpf_code`, −1 meaning the chip's calibrated codes) and the two calibrated
   register codes (`snappnt:espsdr_lpf_calibrated_codes`). `snappnt:analog_bandwidth_mhz` is
   always written: the requested value when `--bandwidth-mhz` is given, `null` (unknown)
   otherwise. A reply other than an `LPF` line, such as `ERR command` from firmware without the
-  query, is recorded as it is, the parsed fields are `null`, and the capture continues. No
+  query, or a code outside 0 to 63, is recorded as it is, the parsed fields are `null`, and
+  the capture continues. The query is repeated for each capture because the firmware applies
+  the code at capture time and frees its hold on the radio after 5 s without a command, so
+  another program may change the setting between captures of one run. No
   command-line option or default changes. The maintainer chose this on issue #44.
 - **Why:** The ESP-SDR firmware keeps its low-pass setting while powered, across host
   connections, so a capture without `--bandwidth-mhz` uses whatever another program set last.

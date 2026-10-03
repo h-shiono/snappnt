@@ -273,13 +273,13 @@ def cmd_capture(a: argparse.Namespace) -> int:
         client.tune(a.freq_hz)
         if a.bandwidth_mhz is not None:
             client.set_bandwidth_mhz(a.bandwidth_mhz)
-        lpf_reply = client.lpf()
         if gain is None:
             client.set_gain_hardware()
         else:
             client.set_gain_manual(gain)
         client.set_sample_rate(a.rate_sps)
         for path in paths:
+            lpf_reply = client.lpf()  # right before each capture; see command_plan
             when = utc_now()
             cap = client.capture(a.samples, bits=a.bits)
             try:

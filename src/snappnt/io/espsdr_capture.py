@@ -25,6 +25,7 @@ BANDWIDTH_MIN_MHZ = 14
 BANDWIDTH_MAX_MHZ = 62
 
 _CHIP = re.compile(r"^(\w+)SDR\b")
+LPF_CODE_MAX = 63
 _LPF = re.compile(r"^LPF (-1|\d+) (\d+) (\d+)$")
 
 
@@ -46,11 +47,15 @@ class LpfState:
 
 def parse_lpf_reply(reply: str) -> LpfState | None:
     """``LPF 40 34 34`` -> ``LpfState(40, (34, 34))``; ``None`` for any other reply, such as
-    ``ERR command`` from firmware without the command."""
+    ``ERR command`` from firmware without the command, or one with a code outside 0 to 63."""
     m = _LPF.match(reply.strip())
     if not m:
         return None
-    return LpfState(int(m.group(1)), (int(m.group(2)), int(m.group(3))))
+    code, reg4, reg5 = (int(g) for g in m.groups())
+    # The firmware's codes are 6 bits wide; anything else is not a reply it can send.
+    if code > LPF_CODE_MAX or reg4 > LPF_CODE_MAX or reg5 > LPF_CODE_MAX:
+        return None
+    return LpfState(code, (reg4, reg5))
 
 
 def chip_name(firmware_info: str | None) -> str:
@@ -189,11 +194,12 @@ def command_plan(
     lines = ["SYNC 1", "INFO", f"FREQ {int(round(mhz))}"]
     if bandwidth_mhz is not None:
         lines.append(f"BANDWIDTH {bandwidth_mhz:g}")
-    lines.append("LPF?")
     lines.append("GAIN HARDWARE" if gain is None else f"GAIN MANUAL {int(gain)}")
     lines.append("LIMITS?")
     index = RATE_INDEX_BY_SPS[int(sample_rate_hz)]
-    lines += [f"CAP{bits * 2} {n_samples} {index}"] * count
+    # LPF? before every capture: the firmware applies its low-pass code at capture time, and
+    # another client may change it if the hold lapses (5 s without a command) between captures.
+    lines += ["LPF?", f"CAP{bits * 2} {n_samples} {index}"] * count
     lines.append("RELEASE")
     return lines
 

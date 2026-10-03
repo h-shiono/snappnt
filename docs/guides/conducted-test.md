@@ -114,8 +114,8 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
   is `null` in AGC mode.
 - `--bandwidth-mhz` sets the analog bandwidth; without it the board's setting is unchanged.
   The firmware keeps the last setting while it is powered, including one made by another
-  program such as the browser viewer. `snappnt capture` therefore always sends `LPF?` and
-  records the reply. `snappnt:analog_bandwidth_mhz` holds a value only when `--bandwidth-mhz`
+  program such as the browser viewer. `snappnt capture` therefore sends `LPF?` immediately
+  before every capture and records the reply in that recording. `snappnt:analog_bandwidth_mhz` holds a value only when `--bandwidth-mhz`
   was given; otherwise it is `null`, meaning the bandwidth in MHz is unknown, and the
   low-pass capacitor code in effect is in `snappnt:espsdr_lpf_code` (see
   `docs/design/espsdr-protocol.md`, "Analog low-pass setting"). Pass `--bandwidth-mhz` when
