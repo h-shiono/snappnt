@@ -121,8 +121,9 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
 
     | Setting | Metadata keys | Confirmed before each capture |
     |---|---|---|
-    | Gain mode and index | `snappnt:espsdr_gain_reply`, `snappnt:espsdr_gain_mode`, `snappnt:espsdr_gain_index` | Yes, by `GAIN?`. If the reply differs from the requested setting (`snappnt:gain_mode`, `snappnt:gain_index`), a warning naming the capture is printed and the capture is kept. |
-    | Low-pass code | `snappnt:espsdr_lpf_reply`, `snappnt:espsdr_lpf_code` | Yes, by `LPF?`. |
+    | Gain mode and index | `snappnt:espsdr_gain_reply`, `snappnt:espsdr_gain_mode`, `snappnt:espsdr_gain_index` | Yes, by `GAIN?`, when the reply is a `GAIN` line. Otherwise (for example `ERR command`) the parsed keys are `null` and the setting is not confirmed. If the reported setting differs from the requested one (`snappnt:gain_mode`, `snappnt:gain_index`), a warning naming the capture is printed and the capture is kept. |
+    | Low-pass code | `snappnt:espsdr_lpf_reply`, `snappnt:espsdr_lpf_code` | Yes, by `LPF?`, when the reply is an `LPF` line. Otherwise the parsed keys are `null` and the code is not confirmed. |
+    | Analog bandwidth in MHz | `snappnt:analog_bandwidth_mhz` | No. It is the value requested with `--bandwidth-mhz` (`null` without it). The firmware reports only the low-pass code, not MHz. |
     | Frequency | `core:frequency` | No. The firmware has no query for the tuned frequency; the value is the one set with `FREQ` at the start of the run. |
 - `--bandwidth-mhz` sets the analog bandwidth; without it the board's setting is unchanged.
   The firmware keeps the last setting while it is powered, including one made by another
