@@ -326,3 +326,27 @@ an earlier one and says so.
   `GAIN HARDWARE -1 0 79 0` with the parsed keys into every recording, without a warning
   ([ESP-SDR serial protocol](../design/espsdr-protocol.md), "Capture request"). The warning
   for a changed gain was tested only with a fake serial port.
+
+## D-021 Satellite visibility uses the `sgp4` package in an optional extra `sky` (2026-10-03)
+
+- **Decision:** `tools/visibility.py` propagates two-line element sets (TLE) with the `sgp4`
+  package, installed through a new optional extra `sky` (`uv sync --extra sky`). The rotation
+  from the TEME frame to an Earth-fixed frame and the conversion to azimuth and elevation are
+  written in snappnt with numpy, so they can be tested without `sgp4`. CI installs the extra
+  for the test job so that the propagation tests run there too. The receiver position is a
+  command-line argument only. Issue #14.
+- **Why:** of the NavIC satellites, NVS-01 is geostationary with a small inclination (about
+  2 degrees in the TLE of 2026-10-03), but IRNSS-1B and IRNSS-1I are in inclined
+  geosynchronous orbits (about 29 degrees), whose look angles change by tens of degrees over
+  a day; a fixed longitude is not enough for them. TLEs are meant to be used with the SGP4
+  model, and `sgp4` is the reference implementation of that model for Python, pure Python
+  with optional compiled speed-up, under the MIT licence.
+- **Alternatives:** Skyfield (larger, adds downloads of ephemeris files for features not
+  needed here). Writing SGP4 inside snappnt (long, and errors would be hard to find). A
+  geostationary-only formula from the published longitude (wrong for the inclined
+  geosynchronous satellites).
+- **Verified:** the Greenwich mean sidereal time matches Vallado's Example 3-5
+  (152.578787810 degrees); elevations match the closed-form formula for a geostationary
+  satellite over a spherical Earth; the NVS-01 TLE gives sub-satellite longitudes of 129.38
+  to 129.55 degrees east over 2026-10-03, against the published slot of 129.5 degrees east
+  (`tests/test_visibility.py`).

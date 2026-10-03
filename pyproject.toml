@@ -26,6 +26,7 @@ dependencies = [
 [project.optional-dependencies]
 hw = ["pyserial>=3.5"]
 plot = ["matplotlib>=3.8"]
+sky = ["sgp4>=2.23"]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.5"]
