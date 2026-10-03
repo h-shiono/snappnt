@@ -27,6 +27,7 @@ BANDWIDTH_MAX_MHZ = 62
 _CHIP = re.compile(r"^(\w+)SDR\b")
 LPF_CODE_MAX = 63
 _LPF = re.compile(r"^LPF (-1|\d+) (\d+) (\d+)$")
+_GAIN = re.compile(r"^GAIN (HARDWARE|MANUAL) (-1|\d+) 0 (\d+) ([01])$")
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,46 @@ def parse_lpf_reply(reply: str) -> LpfState | None:
     return LpfState(code, (reg4, reg5))
 
 
+@dataclass(frozen=True)
+class GainState:
+    """The receive gain setting reported by ``GAIN?`` (docs/design/espsdr-protocol.md).
+
+    ``mode`` is ``"hardware"`` (the hardware AGC chooses the gain and does not report it) or
+    ``"manual"``. ``index`` is the manual gain index, ``None`` in hardware mode (the firmware
+    sends -1). ``max_index`` is the largest index the chip accepts. ``flag`` is bit 23 of
+    the firmware's gain register (``main/common/burst_gain.h:49``); its meaning is not
+    documented there, so it is kept only as reported.
+    """
+
+    mode: str
+    index: int | None
+    max_index: int
+    flag: int
+
+
+def parse_gain_reply(reply: str) -> GainState | None:
+    """``GAIN MANUAL 30 0 79 0`` -> ``GainState("manual", 30, 79, 0)``; ``GAIN HARDWARE -1 0
+    79 0`` -> ``GainState("hardware", None, 79, 0)``. ``None`` for any other reply, such as
+    ``ERR command``, or one whose index does not fit its mode (-1 belongs to hardware mode
+    only, and a manual index cannot exceed the maximum)."""
+    m = _GAIN.match(reply.strip())
+    if not m:
+        return None
+    mode, index, max_index, flag = (
+        m.group(1).lower(),
+        int(m.group(2)),
+        int(m.group(3)),
+        int(m.group(4)),
+    )
+    if mode == "hardware":
+        if index != -1:
+            return None
+        return GainState(mode, None, max_index, flag)
+    if index < 0 or index > max_index:
+        return None
+    return GainState(mode, index, max_index, flag)
+
+
 def chip_name(firmware_info: str | None) -> str:
     """Chip family from an ``INFO`` reply (``C3SDR 6 burst 16380`` -> ``C3``), or ``""``."""
     m = _CHIP.match(firmware_info or "")
@@ -75,6 +116,7 @@ def save_capture_sigmf(
     analog_bandwidth_mhz: float | None = None,
     host_time_utc: datetime | None = None,
     lpf_reply: str | None = None,
+    gain_reply: str | None = None,
 ) -> Path:
     """Write ``capture`` as SigMF (``ci16_le``, 10-bit scale) and return the base path.
 
@@ -93,6 +135,11 @@ def save_capture_sigmf(
     written as ``snappnt:espsdr_lpf_reply``, with ``snappnt:espsdr_lpf_code`` and
     ``snappnt:espsdr_lpf_calibrated_codes`` parsed from it (see ``LpfState``), or ``null``
     when the reply is not an ``LPF`` line.
+
+    ``gain_reply`` (the ``GAIN?`` reply) is written as ``snappnt:espsdr_gain_reply``, with
+    ``snappnt:espsdr_gain_mode`` and ``snappnt:espsdr_gain_index`` parsed from it (see
+    ``GainState``), or ``null`` when the reply is not a ``GAIN`` line. These are what the
+    firmware reported; ``snappnt:gain_mode`` and ``snappnt:gain_index`` are what was requested.
     """
     center = center_frequency_hz if center_frequency_hz is not None else capture.center_frequency_hz
     chip = chip_name(firmware_info)
@@ -111,6 +158,11 @@ def save_capture_sigmf(
         extra["espsdr_lpf_reply"] = lpf_reply
         extra["espsdr_lpf_code"] = None if lpf is None else lpf.code
         extra["espsdr_lpf_calibrated_codes"] = None if lpf is None else list(lpf.calibrated_codes)
+    if gain_reply is not None:
+        state = parse_gain_reply(gain_reply)
+        extra["espsdr_gain_reply"] = gain_reply
+        extra["espsdr_gain_mode"] = None if state is None else state.mode
+        extra["espsdr_gain_index"] = None if state is None else state.index
     stamp = None
     if host_time_utc is not None:
         stamp = host_time_utc.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -197,9 +249,10 @@ def command_plan(
     lines.append("GAIN HARDWARE" if gain is None else f"GAIN MANUAL {int(gain)}")
     lines.append("LIMITS?")
     index = RATE_INDEX_BY_SPS[int(sample_rate_hz)]
-    # LPF? before every capture: the firmware applies its low-pass code at capture time, and
-    # another client may change it if the hold lapses (5 s without a command) between captures.
-    lines += ["LPF?", f"CAP{bits * 2} {n_samples} {index}"] * count
+    # LPF? and GAIN? before every capture: another program may change either setting between
+    # captures, after the hold lapses (5 s without a command) or, on the same transport, at
+    # any time, because the firmware keeps the hold per transport (USB or UART).
+    lines += ["LPF?", "GAIN?", f"CAP{bits * 2} {n_samples} {index}"] * count
     lines.append("RELEASE")
     return lines
 

@@ -51,6 +51,12 @@ a capture command; *word* is one 32-bit entry of the chip's capture memory.
 - One client controls the radio at a time. A second port gets `ERR busy` while the first
   holds it. The hold ends with `RELEASE` (reply `OK`) or after 5 s without a command
   (`fw` `main/targets/esp32c3/receiver.c:225-239`).
+- The hold is kept per transport, USB or UART, not per host program. At commit
+  `550fadea4d00a9e26ce921c5832167becb3dc20c`, `burst_serial_port()` returns the transport on
+  which the last complete line arrived (`main/common/burst_serial.c:99`, `:155`), and the C3
+  receiver compares only that with the holder (`main/targets/esp32c3/receiver.c:276-277`).
+  A second program that opens the same serial device on the host is therefore not refused
+  with `ERR busy`, even while the hold is active.
 - A client must read a complete reply, including the binary payload, before sending the next
   command (`fw` `README.md:68`). After an incomplete transfer, `SYNC <nonce>` is echoed as
   `SYNC <nonce>`, which lets the client find the end of stale bytes
@@ -220,7 +226,15 @@ CAP   <n> <rate-index>      raw 32-bit words
   (`fw` `README.md:68-69`). The reason is a short word, optionally followed by a number.
 - The typical host sequence is (`web` `radio.js:194`):
   `FREQ <MHz>` → `BANDWIDTH <MHz>` (only if a bandwidth is wanted) → `GAIN ...` → `GAIN?`
-  → `CAP20 <n> <rate-index>`. snappnt sends the gain commands only when asked to.
+  → `CAP20 <n> <rate-index>`.
+- `snappnt capture` sends `FREQ`, `BANDWIDTH` (only with `--bandwidth-mhz`) and
+  `GAIN HARDWARE` or `GAIN MANUAL <index>` once per run, then `LPF?`, `GAIN?` and the capture
+  command for every capture, and records both replies in that capture's metadata (decisions
+  D-019 and D-020). The firmware has no query for the tuned frequency: the C3 receiver handles
+  no `FREQ?` (`fw` `main/targets/esp32c3/receiver.c:216-242` at `550fade`), so the frequency
+  in each recording is the one set at the start of the run and is not confirmed before each
+  capture. Re-sending `FREQ` would run the receiver preparation again, including the Wi-Fi
+  channel set-up (`receiver.c:58-81`, `:237-238` at `550fade`).
 
 ## Data sent to the host
 

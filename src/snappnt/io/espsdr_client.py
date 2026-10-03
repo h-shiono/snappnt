@@ -4,7 +4,8 @@ The protocol, with file and line citations into the firmware and browser-client 
 in docs/design/espsdr-protocol.md. Status: written from those sources; **not verified on
 hardware** (issue #11).
 
-Commands used here: INFO, LIMITS?, RANGE?, FREQ, BANDWIDTH, LPF?, GAIN, CAP16/CAP20, RELEASE.
+Commands used here: INFO, LIMITS?, RANGE?, FREQ, BANDWIDTH, LPF?, GAIN, GAIN?, CAP16/CAP20,
+RELEASE.
 Nothing here transmits; the firmware has no transmit command.
 UART default: 2,000,000 baud 8N1.
 """
@@ -136,6 +137,12 @@ class EspSdrClient:
 
     def set_gain_hardware(self) -> str:
         return self._checked("GAIN HARDWARE")
+
+    def gain(self) -> str:
+        """Send ``GAIN?`` and return the reply line unchecked: ``GAIN <HARDWARE|MANUAL> <index>
+        0 <max> <flag>`` on firmware that has the command, ``ERR ...`` otherwise.
+        ``parse_gain_reply`` in ``espsdr_capture`` explains the fields."""
+        return self.command("GAIN?")
 
     def set_bandwidth_mhz(self, mhz: float) -> str:
         return self._checked(f"BANDWIDTH {mhz:g}")
