@@ -7,6 +7,7 @@ in docs/design/espsdr-protocol.md and the decoder in ``espsdr_iq``.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -24,6 +25,32 @@ BANDWIDTH_MIN_MHZ = 14
 BANDWIDTH_MAX_MHZ = 62
 
 _CHIP = re.compile(r"^(\w+)SDR\b")
+_LPF = re.compile(r"^LPF (-1|\d+) (\d+) (\d+)$")
+
+
+@dataclass(frozen=True)
+class LpfState:
+    """The analog low-pass setting reported by ``LPF?`` (docs/design/espsdr-protocol.md).
+
+    ``code`` is the capacitor code the firmware writes into the filter registers for the
+    duration of each capture: 0 (widest) to 63 (narrowest), or -1 when the chip's own
+    calibrated codes are left in place (power-up state and after ``LPF AUTO``). ``BANDWIDTH``
+    converts MHz to such a code through an approximate per-chip table, so the code, not a
+    bandwidth in MHz, is what the firmware keeps. ``calibrated_codes`` are the two register
+    codes read outside a capture, which are the calibrated values.
+    """
+
+    code: int
+    calibrated_codes: tuple[int, int]
+
+
+def parse_lpf_reply(reply: str) -> LpfState | None:
+    """``LPF 40 34 34`` -> ``LpfState(40, (34, 34))``; ``None`` for any other reply, such as
+    ``ERR command`` from firmware without the command."""
+    m = _LPF.match(reply.strip())
+    if not m:
+        return None
+    return LpfState(int(m.group(1)), (int(m.group(2)), int(m.group(3))))
 
 
 def chip_name(firmware_info: str | None) -> str:
@@ -42,6 +69,7 @@ def save_capture_sigmf(
     gain: int | None = None,
     analog_bandwidth_mhz: float | None = None,
     host_time_utc: datetime | None = None,
+    lpf_reply: str | None = None,
 ) -> Path:
     """Write ``capture`` as SigMF (``ci16_le``, 10-bit scale) and return the base path.
 
@@ -53,6 +81,13 @@ def save_capture_sigmf(
     the firmware does not report), ``analog_bandwidth_mhz`` and ``host_time_utc`` (written
     as ``snappnt:host_time_utc`` and ``core:datetime``). The serial port, host and user
     names and the output path are never recorded.
+
+    With ``firmware_info`` given, ``snappnt:analog_bandwidth_mhz`` is always written; ``null``
+    means the bandwidth in MHz is unknown, because the firmware keeps its last setting while
+    powered and reports it only as a capacitor code. ``lpf_reply`` (the ``LPF?`` reply) is
+    written as ``snappnt:espsdr_lpf_reply``, with ``snappnt:espsdr_lpf_code`` and
+    ``snappnt:espsdr_lpf_calibrated_codes`` parsed from it (see ``LpfState``), or ``null``
+    when the reply is not an ``LPF`` line.
     """
     center = center_frequency_hz if center_frequency_hz is not None else capture.center_frequency_hz
     chip = chip_name(firmware_info)
@@ -64,8 +99,13 @@ def save_capture_sigmf(
         extra["espsdr_info"] = firmware_info
         extra["gain_mode"] = "hardware" if gain is None else "manual"
         extra["gain_index"] = gain
-    if analog_bandwidth_mhz is not None:
+    if firmware_info is not None or analog_bandwidth_mhz is not None:
         extra["analog_bandwidth_mhz"] = analog_bandwidth_mhz
+    if lpf_reply is not None:
+        lpf = parse_lpf_reply(lpf_reply)
+        extra["espsdr_lpf_reply"] = lpf_reply
+        extra["espsdr_lpf_code"] = None if lpf is None else lpf.code
+        extra["espsdr_lpf_calibrated_codes"] = None if lpf is None else list(lpf.calibrated_codes)
     stamp = None
     if host_time_utc is not None:
         stamp = host_time_utc.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -149,6 +189,7 @@ def command_plan(
     lines = ["SYNC 1", "INFO", f"FREQ {int(round(mhz))}"]
     if bandwidth_mhz is not None:
         lines.append(f"BANDWIDTH {bandwidth_mhz:g}")
+    lines.append("LPF?")
     lines.append("GAIN HARDWARE" if gain is None else f"GAIN MANUAL {int(gain)}")
     lines.append("LIMITS?")
     index = RATE_INDEX_BY_SPS[int(sample_rate_hz)]

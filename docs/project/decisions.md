@@ -269,3 +269,27 @@ an earlier one and says so.
   group with `pip install --group dev`.
 - **Not verified:** that `claude-code-action` finds `uv` on its PATH after the setup step; the
   first worker run after the merge settles it.
+
+## D-019 `snappnt capture` records the firmware's low-pass code, not an estimated bandwidth (2026-10-03)
+
+- **Decision:** `snappnt capture` sends `LPF?` once before the first capture and records the
+  reply in each recording as `snappnt:espsdr_lpf_reply`, with the parsed capacitor code
+  (`snappnt:espsdr_lpf_code`, −1 meaning the chip's calibrated codes) and the two calibrated
+  register codes (`snappnt:espsdr_lpf_calibrated_codes`). `snappnt:analog_bandwidth_mhz` is
+  always written: the requested value when `--bandwidth-mhz` is given, `null` (unknown)
+  otherwise. A reply other than an `LPF` line, such as `ERR command` from firmware without the
+  query, is recorded as it is, the parsed fields are `null`, and the capture continues. No
+  command-line option or default changes. The maintainer chose this on issue #44.
+- **Why:** The ESP-SDR firmware keeps its low-pass setting while powered, across host
+  connections, so a capture without `--bandwidth-mhz` uses whatever another program set last.
+  In the first ESP32-C3 bench session a capture taken after the browser viewer had set 20 MHz
+  carried that pass band with no trace in its metadata
+  ([ESP32-C3 bench checks](../results/esp32c3-bench-no-rf.md)). The firmware stores only a
+  capacitor code and never reports MHz ([ESP-SDR serial protocol](../design/espsdr-protocol.md),
+  "Analog low-pass setting"), so the code is the setting that can be recorded exactly.
+- **Alternatives:** Estimating MHz from the code with the firmware's per-chip table (the table
+  is approximate, has no value for code −1, and copying it into snappnt is a question for
+  issue #7; the recorded code can be converted later). Making `--bandwidth-mhz` required, or
+  always sending a default bandwidth (both change the command line).
+- **Verified on hardware:** the `LPF?` replies on one ESP32-C3 listed on the protocol page.
+  A full `snappnt capture` run that writes these keys was checked on the same board.

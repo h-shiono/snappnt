@@ -8,7 +8,8 @@ as read from the firmware and browser-client sources. It is the basis for
 on hardware in [ESP32-C3 bench checks without an RF source](../results/esp32c3-bench-no-rf.md)
 (issue #41): the replies to `INFO`, `CAPS`, `LIMITS?`, `RANGE?`, `TRANSPORT?`, `GAIN?` and
 `FREQ 2492`; the maximum of 16380 samples per capture (16381 is rejected); the `CAP20` header,
-payload length and CRC-32; and the sign of frequency (the spectrum is not mirrored). Everything
+payload length and CRC-32; and the sign of frequency (the spectrum is not mirrored). The
+replies to `LPF?` were checked in issue #44 (see "Analog low-pass setting"). Everything
 else on this page, and every other chip, has not been verified on hardware. Further hardware
 verification is tracked in issue #11.
 
@@ -76,7 +77,8 @@ does not parse, or whose numbers are out of range, is answered with `ERR command
 | `RANGE?` | `RANGE 100 6000 1` | Tuning range in MHz and step | `receiver.c:185-187`, `main/common/rx_tuning.h:5-7` |
 | `TRANSPORT?` | `TRANSPORT USB 0` or `TRANSPORT UART <baud>` | Active interface | `receiver.c:146-151` |
 | `FREQ <MHz>` | `OK` | Tune to a whole number of MHz | `receiver.c:189-190` |
-| `BANDWIDTH <MHz>` | `OK` | Analog bandwidth, 0 = widest | `receiver.c:175-178` |
+| `BANDWIDTH <MHz>` | `OK` | Analog bandwidth, 0 = widest; stored as a capacitor code | `receiver.c:175-178` |
+| `LPF?` | `LPF <code> <reg4> <reg5>` | Analog low-pass state; see "Analog low-pass setting" | `receiver.c:181-183` |
 | `GAIN MANUAL <index>` / `GAIN HARDWARE` / `GAIN?` | `OK` / `OK` / `GAIN <mode> <index> 0 <max> <flag>` | Gain control | `main/common/burst_gain.h:46-56` |
 | `CAP16 <n> <rate-index>` | `DATA ...` then payload | 8-bit capture | `receiver.c:156`, `:191-193` |
 | `CAP20 <n> <rate-index>` | `DATA ...` then payload | 10-bit packed capture | `receiver.c:191-193` |
@@ -86,8 +88,9 @@ does not parse, or whose numbers are out of range, is answered with `ERR command
 | `RELEASE` | `OK` | Free the radio | `receiver.c:232-234` |
 | `BAUD?` / `BAUD <1000000\|2000000>` | `BAUD <rate>` / `OK BAUD <rate>` | UART only | `main/common/burst_serial.c:39-69` |
 
-Other commands exist (`LPF`, `LPF?`, `LPF AUTO`, `receiver.c:179-184`) and are not used by
-snappnt. In the C3 receiver source and the shared files, no command transmits: the only
+`LPF?` is described under "Analog low-pass setting" below. The commands `LPF <code>` and
+`LPF AUTO` (`receiver.c:179-180`) set the same state directly and are not used by snappnt.
+In the C3 receiver source and the shared files, no command transmits: the only
 transmit-related calls turn transmission off while preparing reception
 (`receiver.c:72-74`). The firmware README says the same (`fw` `README.md:21-22`). snappnt
 therefore implements no transmit command.
@@ -119,6 +122,45 @@ checked on hardware answered `CAPS` with these words
 - The frequency is applied immediately, and the command replies `OK` after the radio has been
   prepared (`receiver.c:190`).
 - The browser client sends `FREQ` only when the frequency changed (`web` `radio.js:161`).
+
+## Analog low-pass setting
+
+The ESP32-C3 sets its analog bandwidth with a 6-bit capacitor code in two registers of the
+baseband block (BBTOP block `0x67`, I2C host 1, registers 4 and 5), one for I and one for Q
+(`receiver.c:39-49`).
+
+- The firmware keeps one value, `rx_filter`, which starts at −1 after power-up
+  (`receiver.c:37`). While it is −1 the chip's own calibrated codes are used. Otherwise, before
+  each capture the firmware saves the two registers, writes `rx_filter` into their low 6 bits,
+  and restores the saved values after the capture, also when the capture fails
+  (`receiver.c:39-49`, `:111`, `:132`).
+- `BANDWIDTH <MHz>` does not store MHz. It converts MHz into a capacitor code by linear
+  interpolation in a per-chip table and stores the code in `rx_filter` (`receiver.c:175-178`,
+  `fw` `main/common/rx_bandwidth.h:44-100`). For example, the C3 table gives code 40 for
+  20 MHz (`rx_bandwidth.h:46-49`). The firmware describes the table values as approximate
+  receive-path noise widths, not a −3 dB specification (`rx_bandwidth.h:3-4`,
+  `fw` `docs/rx-controls.md:25-29`). `BANDWIDTH 0` selects code 0, the widest setting, not a
+  filter bypass. A request at or above the widest table value (62 MHz) also gives code 0, so `BANDWIDTH 62`
+  and `BANDWIDTH 0` set the same code.
+- `LPF <code>` (0 to 63) stores a code directly; `LPF AUTO` sets −1 (`receiver.c:179-180`).
+- `LPF?` replies `LPF <rx_filter> <reg4> <reg5>` (`receiver.c:181-183`). `<reg4>` and `<reg5>`
+  are the low 6 bits of the two registers, read outside a capture, so they are the calibrated
+  codes and not the override.
+- The value survives between host connections for as long as the board is powered: nothing
+  but these three commands changes it. A capture made without `BANDWIDTH` therefore uses the
+  last setting of whichever program talked to the board before.
+
+So the firmware never reports the bandwidth in MHz. A value in MHz can only be estimated from
+the code through the table above, and not at all while the code is −1. snappnt records the
+`LPF?` reply and its parsed fields with every capture and does not estimate MHz (decision
+D-019). The same lines are at `receiver.c:39-50`, `:113`, `:134` and `:223-231` in commit
+`550fadea4d00a9e26ce921c5832167becb3dc20c`, and the C3 table is unchanged there.
+
+Checked on an ESP32-C3 running firmware that answers `CAPS` with `SPEC ...` (the `550fade`
+lineage): the replies were `LPF 0 34 34` at the start (a setting left from an earlier session), `LPF 40 34 34`
+after `BANDWIDTH 20`, `LPF 0 34 34` after `BANDWIDTH 0` and after `BANDWIDTH 62`,
+`LPF 63 34 34` after `BANDWIDTH 14`, and `LPF -1 34 34` after `LPF AUTO`. The calibrated codes
+of other boards may differ.
 
 ## Setting the sample rate
 
