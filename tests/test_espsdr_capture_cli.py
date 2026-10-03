@@ -28,9 +28,9 @@ INFO = b"C3SDR 6 burst 16380\n"
 SYNC = b"SYNC 1\n"
 # Reply to LPF? on an ESP32-C3 after BANDWIDTH 0 (override code 0, calibrated codes 34 and 34).
 LPF = b"LPF 0 34 34\n"
-# Replies to GAIN? on an ESP32-C3 (docs/results/esp32c3-bench-no-rf.md for hardware mode).
+# Replies to GAIN? seen on an ESP32-C3 (docs/design/espsdr-protocol.md, "Capture request").
 GAIN_HW = b"GAIN HARDWARE -1 0 79 0\n"
-GAIN_30 = b"GAIN MANUAL 30 0 79 0\n"
+GAIN_30 = b"GAIN MANUAL 30 0 79 1\n"
 SCENARIOS = Path(__file__).resolve().parents[1] / "scenarios"
 ZERO_BODY = bytes(640)  # 256 samples of 10 bits
 
@@ -326,7 +326,7 @@ def test_count_three_writes_numbered_files_with_own_time_and_gain(fake_port, tmp
         meta = json.loads((tmp_path / f"run_{i:04d}.sigmf-meta").read_text())
         assert meta["global"]["snappnt:gain_mode"] == "manual"
         assert meta["global"]["snappnt:gain_index"] == 30
-        assert meta["global"]["snappnt:espsdr_gain_reply"] == "GAIN MANUAL 30 0 79 0"
+        assert meta["global"]["snappnt:espsdr_gain_reply"] == "GAIN MANUAL 30 0 79 1"
         assert meta["global"]["snappnt:espsdr_gain_mode"] == "manual"
         assert meta["global"]["snappnt:espsdr_gain_index"] == 30
         assert meta["captures"][0]["core:datetime"] == meta["global"]["snappnt:host_time_utc"]

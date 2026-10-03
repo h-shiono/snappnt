@@ -321,6 +321,8 @@ an earlier one and says so.
   source and was not measured, and calibration would be repeated for every recording).
   Re-sending the settings only when more than 5 s have passed since the last command (does
   not cover a second program on the same transport). Documenting the limitation only.
-- **Verified on hardware:** the `GAIN?` reply in hardware mode on one ESP32-C3
-  ([ESP32-C3 bench checks](../results/esp32c3-bench-no-rf.md)). A `snappnt capture` run that
-  writes these keys has not been run on hardware (issue #11).
+- **Verified on hardware:** on one ESP32-C3, `snappnt capture` runs of two captures each with
+  `--gain 30` and with `--gain auto` wrote `GAIN MANUAL 30 0 79 1` and
+  `GAIN HARDWARE -1 0 79 0` with the parsed keys into every recording, without a warning
+  ([ESP-SDR serial protocol](../design/espsdr-protocol.md), "Capture request"). The warning
+  for a changed gain was tested only with a fake serial port.

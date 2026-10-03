@@ -9,7 +9,8 @@ on hardware in [ESP32-C3 bench checks without an RF source](../results/esp32c3-b
 (issue #41): the replies to `INFO`, `CAPS`, `LIMITS?`, `RANGE?`, `TRANSPORT?`, `GAIN?` and
 `FREQ 2492`; the maximum of 16380 samples per capture (16381 is rejected); the `CAP20` header,
 payload length and CRC-32; and the sign of frequency (the spectrum is not mirrored). The
-replies to `LPF?` were checked in issue #44 (see "Analog low-pass setting"). Everything
+replies to `LPF?` were checked in issue #44 (see "Analog low-pass setting"), and the replies
+to `GAIN?` in manual and hardware mode in issue #51 (see "Capture request"). Everything
 else on this page, and every other chip, has not been verified on hardware. Further hardware
 verification is tracked in issue #11.
 
@@ -235,6 +236,12 @@ CAP   <n> <rate-index>      raw 32-bit words
   in each recording is the one set at the start of the run and is not confirmed before each
   capture. Re-sending `FREQ` would run the receiver preparation again, including the Wi-Fi
   channel set-up (`receiver.c:58-81`, `:237-238` at `550fade`).
+- Checked on an ESP32-C3 running firmware of the `550fade` lineage, with `snappnt capture`
+  and two captures per run: `GAIN?` replied `GAIN MANUAL 30 0 79 1` before both captures
+  after `GAIN MANUAL 30`, and `GAIN HARDWARE -1 0 79 0` before both captures after
+  `GAIN HARDWARE`. The last field, bit 23 of the gain register (`main/common/burst_gain.h:49`),
+  was 1 in manual mode and 0 in hardware mode; the firmware does not document its meaning,
+  so snappnt only records it.
 
 ## Data sent to the host
 
