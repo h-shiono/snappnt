@@ -113,6 +113,13 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
   `GAIN MANUAL <index>`. The firmware does not report the AGC gain it chose, so `snappnt:gain_index`
   is `null` in AGC mode.
 - `--bandwidth-mhz` sets the analog bandwidth; without it the board's setting is unchanged.
+  The firmware keeps the last setting while it is powered, including one made by another
+  program such as the browser viewer. `snappnt capture` therefore sends `LPF?` immediately
+  before every capture and records the reply in that recording. `snappnt:analog_bandwidth_mhz` holds a value only when `--bandwidth-mhz`
+  was given; otherwise it is `null`, meaning the bandwidth in MHz is unknown, and the
+  low-pass capacitor code in effect is in `snappnt:espsdr_lpf_code` (see
+  `docs/design/espsdr-protocol.md`, "Analog low-pass setting"). Pass `--bandwidth-mhz` when
+  the bandwidth matters for the recording.
   `--bits 8` uses the 8-bit transfer, `--bits 10` (default) the packed 10-bit transfer.
 - The command refuses to start if any output file already exists; `--overwrite` replaces them.
   `--dry-run` prints the full sequence including the final `RELEASE`. It checks the frequency,
@@ -129,6 +136,7 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
 - Metadata in each `.sigmf-meta`: `core:hw` (`ESP-SDR` and the chip family), `snappnt:espsdr_info`
   (the firmware's `INFO` reply), `snappnt:host_time_utc` and `core:datetime`,
   `snappnt:gain_mode`, `snappnt:gain_index`, `snappnt:analog_bandwidth_mhz`,
+  `snappnt:espsdr_lpf_reply`, `snappnt:espsdr_lpf_code`, `snappnt:espsdr_lpf_calibrated_codes`,
   `snappnt:espsdr_transfer_bits`, `snappnt:espsdr_capture_us`. The serial port name, host name,
   user name and output path are not recorded.
 - **Not verified on hardware.** The command sequence follows the protocol page

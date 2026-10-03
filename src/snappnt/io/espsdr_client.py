@@ -4,7 +4,7 @@ The protocol, with file and line citations into the firmware and browser-client 
 in docs/design/espsdr-protocol.md. Status: written from those sources; **not verified on
 hardware** (issue #11).
 
-Commands used here: INFO, LIMITS?, RANGE?, FREQ, BANDWIDTH, GAIN, CAP16/CAP20, RELEASE.
+Commands used here: INFO, LIMITS?, RANGE?, FREQ, BANDWIDTH, LPF?, GAIN, CAP16/CAP20, RELEASE.
 Nothing here transmits; the firmware has no transmit command.
 UART default: 2,000,000 baud 8N1.
 """
@@ -139,6 +139,12 @@ class EspSdrClient:
 
     def set_bandwidth_mhz(self, mhz: float) -> str:
         return self._checked(f"BANDWIDTH {mhz:g}")
+
+    def lpf(self) -> str:
+        """Send ``LPF?`` and return the reply line unchecked: ``LPF <code> <reg4> <reg5>`` on
+        firmware that has the command, ``ERR ...`` otherwise. ``parse_lpf_reply`` in
+        ``espsdr_capture`` explains the fields."""
+        return self.command("LPF?")
 
     def release(self) -> str:
         return self.command("RELEASE")

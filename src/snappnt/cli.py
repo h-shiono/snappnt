@@ -279,6 +279,7 @@ def cmd_capture(a: argparse.Namespace) -> int:
             client.set_gain_manual(gain)
         client.set_sample_rate(a.rate_sps)
         for path in paths:
+            lpf_reply = client.lpf()  # right before each capture; see command_plan
             when = utc_now()
             cap = client.capture(a.samples, bits=a.bits)
             try:
@@ -289,6 +290,7 @@ def cmd_capture(a: argparse.Namespace) -> int:
                     gain=gain,
                     analog_bandwidth_mhz=a.bandwidth_mhz,
                     host_time_utc=when,
+                    lpf_reply=lpf_reply,
                     description="snappnt capture",
                 )
             except OSError as e:
@@ -430,7 +432,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--rate-sps", type=float, default=80e6)
     s.add_argument("-n", "--samples", type=int, default=16380)
     s.add_argument("--gain", default="auto", help="'auto' (hardware AGC) or a gain index")
-    s.add_argument("--bandwidth-mhz", type=float, help="analog bandwidth (default: unchanged)")
+    s.add_argument(
+        "--bandwidth-mhz",
+        type=float,
+        help="analog bandwidth (default: unchanged, recorded as unknown)",
+    )
     s.add_argument("--count", type=int, default=1, help="number of captures, one file each")
     s.add_argument("-o", "--output", default="out/capture", help="output base path")
     s.add_argument("--bits", type=int, choices=(8, 10), default=10)
