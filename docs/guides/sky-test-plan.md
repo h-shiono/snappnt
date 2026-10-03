@@ -83,7 +83,10 @@ uv run python tools/visibility.py --tle tests/data/navic_celestrak_2026-10-03.tl
 The CSV has the columns `time_utc`, `name`, `norad_id`, `elevation_deg`, `azimuth_deg`
 (clockwise from north) and `range_m`. A summary per satellite (lowest and highest elevation,
 share of samples above `--min-elevation-deg`, default 5° as in the ICD) goes to standard
-error. For a real test, download a current TLE file first, because TLEs age:
+error, with the epoch of each TLE. The tool warns when the computed times are more than
+7 days from a TLE's epoch (a threshold chosen for this tool, not taken from a source: SGP4 does
+not model station keeping, so an old TLE of a geostationary satellite drifts away from the real
+position). For a real test, download a current TLE file first:
 
 ```bash
 curl -o out/navic.tle "https://celestrak.org/NORAD/elements/gp.php?NAME=IRNSS&FORMAT=TLE"

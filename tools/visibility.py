@@ -35,6 +35,11 @@ WGS84_E2 = WGS84_F * (2.0 - WGS84_F)
 
 CSV_COLUMNS = ["time_utc", "name", "norad_id", "elevation_deg", "azimuth_deg", "range_m"]
 
+# Own choice, not a source value: SGP4 does not model station keeping, so the predicted
+# position of a geostationary satellite drifts away from the real one as the TLE ages.
+# A warning is printed when the computed times are further than this from the TLE epoch.
+MAX_TLE_AGE_DAYS = 7.0
+
 
 @dataclass(frozen=True)
 class Tle:
@@ -45,6 +50,14 @@ class Tle:
     @property
     def norad_id(self) -> int:
         return int(self.line1[2:7])
+
+    @property
+    def epoch(self) -> datetime:
+        """Epoch from line 1: two-digit year (57-99 -> 19xx) and day of year with fraction."""
+        yy = int(self.line1[18:20])
+        year = 1900 + yy if yy >= 57 else 2000 + yy
+        day = float(self.line1[20:32])
+        return datetime(year, 1, 1, tzinfo=UTC) + timedelta(days=day - 1.0)
 
 
 @dataclass(frozen=True)
@@ -176,6 +189,13 @@ def track(
     """Rows of look angles for each satellite at each time step (start to start + duration)."""
     obs = geodetic_to_ecef(lat_deg, lon_deg, height_m)
     n = int(math.floor(duration_s / step_s)) + 1
+    # Whole seconds unless the step or the start needs a fraction, so that no two rows of
+    # one satellite share a time stamp.
+    time_format = (
+        "%Y-%m-%dT%H:%M:%S.%fZ"
+        if step_s != math.floor(step_s) or start.microsecond != 0
+        else "%Y-%m-%dT%H:%M:%SZ"
+    )
     rows = []
     for k in range(n):
         t = start + timedelta(seconds=k * step_s)
@@ -183,7 +203,7 @@ def track(
             la = look_angles(obs, lat_deg, lon_deg, satellite_ecef_m(tle, t))
             rows.append(
                 {
-                    "time_utc": t.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "time_utc": t.astimezone(UTC).strftime(time_format),
                     "name": tle.name,
                     "norad_id": tle.norad_id,
                     "elevation_deg": round(la.elevation_deg, 3),
@@ -205,6 +225,18 @@ def summary(rows: list[dict], min_elevation_deg: float) -> list[str]:
             f"{above:.0f} % of samples at or above {min_elevation_deg:g} deg"
         )
     return lines
+
+
+def stale_tles(
+    tles: list[Tle], start: datetime, end: datetime, max_days: float = MAX_TLE_AGE_DAYS
+) -> list[tuple[Tle, float]]:
+    """TLEs whose epoch is more than max_days from start or end, with that distance in days."""
+    out = []
+    for tle in tles:
+        days = max(abs(start - tle.epoch), abs(end - tle.epoch)) / timedelta(days=1)
+        if days > max_days:
+            out.append((tle, days))
+    return out
 
 
 def _parse_time(s: str) -> datetime:
@@ -231,6 +263,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("-o", "--output", type=Path, help="CSV file (default: stdout)")
     a = p.parse_args(argv)
 
+    for opt in ("lat_deg", "lon_deg", "height_m", "hours", "step_min", "min_elevation_deg"):
+        if not math.isfinite(getattr(a, opt)):
+            p.error(f"--{opt.replace('_', '-')} must be a finite number")
     if not -90.0 <= a.lat_deg <= 90.0:
         p.error("--lat-deg must be between -90 and 90")
     if a.hours < 0 or a.step_min <= 0:
@@ -255,8 +290,17 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         if a.output:
             f.close()
+    for tle in tles:
+        print(f"{tle.name}: TLE epoch {tle.epoch:%Y-%m-%d %H:%M} UTC", file=sys.stderr)
     for line in summary(rows, a.min_elevation_deg):
         print(line, file=sys.stderr)
+    end = start + timedelta(hours=a.hours)
+    for tle, days in stale_tles(tles, start, end):
+        print(
+            f"warning: {tle.name}: computed times are up to {days:.1f} days from the TLE "
+            f"epoch (more than {MAX_TLE_AGE_DAYS:g}); download a current TLE file",
+            file=sys.stderr,
+        )
     return 0
 
 

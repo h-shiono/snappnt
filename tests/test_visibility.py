@@ -142,3 +142,67 @@ def test_cli_csv(capsys):
 def test_cli_rejects_bad_latitude():
     with pytest.raises(SystemExit):
         vis.main(["--tle", str(TLE_PATH), "--lat-deg", "91", "--lon-deg", "0"])
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ["--hours", "nan"],
+        ["--hours", "inf"],
+        ["--step-min", "nan"],
+        ["--lon-deg", "nan"],
+        ["--height-m", "inf"],
+        ["--min-elevation-deg", "nan"],
+    ],
+)
+def test_cli_rejects_non_finite(extra, capsys):
+    base = ["--tle", str(TLE_PATH), "--lat-deg", "0", "--lon-deg", "129.5"]
+    with pytest.raises(SystemExit) as e:
+        vis.main([*base, *extra])
+    assert e.value.code == 2
+    assert "finite" in capsys.readouterr().err
+
+
+def test_tle_epoch_from_line1():
+    # NVS-01 line 1 epoch field "26275.91908652": 2026, day 275 = 2 October (2026 is not a
+    # leap year; day 273 = 30 September), 0.91908652 day = 22:03:29.07
+    nvs01 = next(t for t in vis.read_tle(TLE_PATH) if t.norad_id == 56759)
+    assert abs(nvs01.epoch - datetime(2026, 10, 2, 22, 3, 29, 75000, tzinfo=UTC)) < timedelta(
+        milliseconds=1
+    )
+    # two-digit years 57-99 belong to the 1900s
+    old = vis.Tle("x", "1 00005U 58002B   99001.50000000" + " " * 38, "2 00005")
+    assert old.epoch == datetime(1999, 1, 1, 12, tzinfo=UTC)
+
+
+def test_stale_tles():
+    nvs01 = next(t for t in vis.read_tle(TLE_PATH) if t.norad_id == 56759)
+    e = nvs01.epoch
+    assert vis.stale_tles([nvs01], e, e + timedelta(days=1)) == []
+    assert vis.stale_tles([nvs01], e - timedelta(days=6), e + timedelta(days=6)) == []
+    stale = vis.stale_tles([nvs01], e + timedelta(days=30), e + timedelta(days=31))
+    assert [t.norad_id for t, _ in stale] == [56759]
+    assert stale[0][1] == pytest.approx(31.0)
+
+
+def test_cli_warns_on_old_tle(capsys):
+    pytest.importorskip("sgp4")
+    args = ["--tle", str(TLE_PATH), "--lat-deg", "0", "--lon-deg", "129.5", "--name", "NVS-01"]
+    assert vis.main([*args, "--start", "2027-10-03T00:00:00Z", "--hours", "0"]) == 0
+    err = capsys.readouterr().err
+    assert "TLE epoch 2026-10-02 22:03 UTC" in err
+    assert "warning: NVS-01" in err
+    assert vis.main([*args, "--start", "2026-10-03T00:00:00Z", "--hours", "1"]) == 0
+    assert "warning" not in capsys.readouterr().err
+
+
+def test_cli_sub_second_steps_have_distinct_times(capsys):
+    pytest.importorskip("sgp4")
+    args = ["--tle", str(TLE_PATH), "--lat-deg", "0", "--lon-deg", "129.5", "--name", "NVS-01"]
+    # step 0.005 min = 0.3 s over 0.0005 h = 1.8 s: 7 rows
+    args += ["--start", "2026-10-03T00:00:00Z", "--hours", "0.0005", "--step-min", "0.005"]
+    assert vis.main(args) == 0
+    rows = list(csv.DictReader(io.StringIO(capsys.readouterr().out)))
+    times = [r["time_utc"] for r in rows]
+    assert len(times) == 7 and len(set(times)) == 7
+    assert times[1] == "2026-10-03T00:00:00.300000Z"
