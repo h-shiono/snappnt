@@ -296,3 +296,33 @@ an earlier one and says so.
   always sending a default bandwidth (both change the command line).
 - **Verified on hardware:** the `LPF?` replies on one ESP32-C3 listed on the protocol page.
   A full `snappnt capture` run that writes these keys was checked on the same board.
+
+## D-020 `snappnt capture` queries the gain before every capture; the frequency is not confirmed (2026-10-03)
+
+- **Decision:** `snappnt capture` sends `GAIN?` immediately before every capture, after
+  `LPF?`, and records the reply in that recording as `snappnt:espsdr_gain_reply`, with the
+  parsed mode (`snappnt:espsdr_gain_mode`, `hardware` or `manual`) and index
+  (`snappnt:espsdr_gain_index`, `null` in hardware mode). `snappnt:gain_mode` and
+  `snappnt:gain_index` keep their meaning, the requested setting. If the reported setting
+  differs from the requested one, a warning naming the capture is printed and the capture is
+  kept. A reply other than a `GAIN` line is recorded as it is, with `null` parsed keys. The
+  frequency is not re-sent and not confirmed; the conducted-test guide states this for each
+  recorded setting. No command-line option or default changes. The maintainer chose this on
+  issue #51 (option (a) of four).
+- **Why:** `FREQ` and `GAIN` are sent once per run, and another program can change them
+  before a later capture: the firmware frees its hold on the radio after 5 s without a
+  command, and it keeps the hold per transport (USB or UART), so a second program on the same
+  serial device is not refused at all ([ESP-SDR serial protocol](../design/espsdr-protocol.md),
+  "Transport"). Only a query confirms a setting. The firmware answers `GAIN?` but has no query
+  for the frequency. The browser client sends `GAIN?` before each capture as well
+  ([ESP-SDR serial protocol](../design/espsdr-protocol.md), "Capture request").
+- **Alternatives:** Re-sending `FREQ` before every capture (it runs the receiver preparation
+  again, including the Wi-Fi channel set-up; the time this takes cannot be read from the
+  source and was not measured, and calibration would be repeated for every recording).
+  Re-sending the settings only when more than 5 s have passed since the last command (does
+  not cover a second program on the same transport). Documenting the limitation only.
+- **Verified on hardware:** on one ESP32-C3, `snappnt capture` runs of two captures each with
+  `--gain 30` and with `--gain auto` wrote `GAIN MANUAL 30 0 79 1` and
+  `GAIN HARDWARE -1 0 79 0` with the parsed keys into every recording, without a warning
+  ([ESP-SDR serial protocol](../design/espsdr-protocol.md), "Capture request"). The warning
+  for a changed gain was tested only with a fake serial port.

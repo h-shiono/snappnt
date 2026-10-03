@@ -219,6 +219,7 @@ def cmd_capture(a: argparse.Namespace) -> int:
         capture_paths,
         command_plan,
         existing_outputs,
+        parse_gain_reply,
         save_capture_sigmf,
         utc_now,
     )
@@ -278,8 +279,17 @@ def cmd_capture(a: argparse.Namespace) -> int:
         else:
             client.set_gain_manual(gain)
         client.set_sample_rate(a.rate_sps)
+        requested = ("hardware", None) if gain is None else ("manual", gain)
         for path in paths:
             lpf_reply = client.lpf()  # right before each capture; see command_plan
+            gain_reply = client.gain()
+            state = parse_gain_reply(gain_reply)
+            if state is not None and (state.mode, state.index) != requested:
+                print(
+                    f"warning: capture {done + 1} of {a.count}: the board reports "
+                    f"{gain_reply!r}, not the requested gain; recorded as reported",
+                    file=sys.stderr,
+                )
             when = utc_now()
             cap = client.capture(a.samples, bits=a.bits)
             try:
@@ -291,6 +301,7 @@ def cmd_capture(a: argparse.Namespace) -> int:
                     analog_bandwidth_mhz=a.bandwidth_mhz,
                     host_time_utc=when,
                     lpf_reply=lpf_reply,
+                    gain_reply=gain_reply,
                     description="snappnt capture",
                 )
             except OSError as e:

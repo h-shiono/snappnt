@@ -112,6 +112,19 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
 - `--gain auto` (default) selects the hardware AGC (`GAIN HARDWARE`). `--gain <index>` sets
   `GAIN MANUAL <index>`. The firmware does not report the AGC gain it chose, so `snappnt:gain_index`
   is `null` in AGC mode.
+- Settings are sent once at the start of a run, but another program can change them later:
+  the firmware frees its hold on the radio after 5 s without a command, and a second program
+  on the same serial device (USB or UART) is not refused even while the hold is active
+  (`docs/design/espsdr-protocol.md`, "Transport"). Close the browser viewer and other serial
+  programs before a run. Whether each recorded setting was confirmed immediately before its
+  capture:
+
+    | Setting | Metadata keys | Confirmed before each capture |
+    |---|---|---|
+    | Gain mode and index | `snappnt:espsdr_gain_reply`, `snappnt:espsdr_gain_mode`, `snappnt:espsdr_gain_index` | Yes, by `GAIN?`, when the reply is a `GAIN` line. Otherwise (for example `ERR command`) the parsed keys are `null` and the setting is not confirmed. If the reported setting differs from the requested one (`snappnt:gain_mode`, `snappnt:gain_index`), a warning naming the capture is printed and the capture is kept. |
+    | Low-pass code | `snappnt:espsdr_lpf_reply`, `snappnt:espsdr_lpf_code` | Yes, by `LPF?`, when the reply is an `LPF` line. Otherwise the parsed keys are `null` and the code is not confirmed. |
+    | Analog bandwidth in MHz | `snappnt:analog_bandwidth_mhz` | No. It is the value requested with `--bandwidth-mhz` (`null` without it). The firmware reports only the low-pass code, not MHz. |
+    | Frequency | `core:frequency` | No. The firmware has no query for the tuned frequency; the value is the one set with `FREQ` at the start of the run. |
 - `--bandwidth-mhz` sets the analog bandwidth; without it the board's setting is unchanged.
   The firmware keeps the last setting while it is powered, including one made by another
   program such as the browser viewer. `snappnt capture` therefore sends `LPF?` immediately
@@ -137,6 +150,7 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
   (the firmware's `INFO` reply), `snappnt:host_time_utc` and `core:datetime`,
   `snappnt:gain_mode`, `snappnt:gain_index`, `snappnt:analog_bandwidth_mhz`,
   `snappnt:espsdr_lpf_reply`, `snappnt:espsdr_lpf_code`, `snappnt:espsdr_lpf_calibrated_codes`,
+  `snappnt:espsdr_gain_reply`, `snappnt:espsdr_gain_mode`, `snappnt:espsdr_gain_index`,
   `snappnt:espsdr_transfer_bits`, `snappnt:espsdr_capture_us`. The serial port name, host name,
   user name and output path are not recorded.
 - **Not verified on hardware.** The command sequence follows the protocol page

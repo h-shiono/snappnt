@@ -15,13 +15,22 @@ import pytest
 
 from snappnt import cli
 from snappnt.io import espsdr_client
-from snappnt.io.espsdr_capture import LpfState, capture_paths, parse_lpf_reply
+from snappnt.io.espsdr_capture import (
+    GainState,
+    LpfState,
+    capture_paths,
+    parse_gain_reply,
+    parse_lpf_reply,
+)
 from tests.test_espsdr_client import LIMITS_C3, FakePort, data_reply
 
 INFO = b"C3SDR 6 burst 16380\n"
 SYNC = b"SYNC 1\n"
 # Reply to LPF? on an ESP32-C3 after BANDWIDTH 0 (override code 0, calibrated codes 34 and 34).
 LPF = b"LPF 0 34 34\n"
+# Replies to GAIN? seen on an ESP32-C3 (docs/design/espsdr-protocol.md, "Capture request").
+GAIN_HW = b"GAIN HARDWARE -1 0 79 0\n"
+GAIN_30 = b"GAIN MANUAL 30 0 79 1\n"
 SCENARIOS = Path(__file__).resolve().parents[1] / "scenarios"
 ZERO_BODY = bytes(640)  # 256 samples of 10 bits
 
@@ -75,6 +84,7 @@ def test_dry_run_prints_the_command_sequence(capsys):
         "GAIN HARDWARE",
         "LIMITS?",
         "LPF?",
+        "GAIN?",
         "CAP20 256 0",
         "RELEASE",
     ]
@@ -104,7 +114,7 @@ def test_bad_arguments_exit_2_and_write_nothing(args, tmp_path, capsys):
 
 def test_one_capture_sends_expected_lines_and_writes_one_file(fake_port, tmp_path, capsys):
     port = fake_port(
-        SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, data_reply(ZERO_BODY, 256), b"OK\n"
+        SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, GAIN_HW, data_reply(ZERO_BODY, 256), b"OK\n"
     )
     out = tmp_path / "cap"
     assert run("PORT", "-n", "256", "-o", str(out)) == 0
@@ -115,6 +125,7 @@ def test_one_capture_sends_expected_lines_and_writes_one_file(fake_port, tmp_pat
         "GAIN HARDWARE",
         "LIMITS?",
         "LPF?",
+        "GAIN?",
         "CAP20 256 0",
         "RELEASE",
     ]
@@ -123,7 +134,12 @@ def test_one_capture_sends_expected_lines_and_writes_one_file(fake_port, tmp_pat
     assert g["core:hw"] == "ESP-SDR C3"
     assert g["snappnt:espsdr_info"] == "C3SDR 6 burst 16380"
     assert g["snappnt:gain_mode"] == "hardware" and g["snappnt:gain_index"] is None
-    assert "wrote" in capsys.readouterr().out
+    assert g["snappnt:espsdr_gain_reply"] == "GAIN HARDWARE -1 0 79 0"
+    assert g["snappnt:espsdr_gain_mode"] == "hardware"
+    assert g["snappnt:espsdr_gain_index"] is None
+    captured = capsys.readouterr()
+    assert "wrote" in captured.out
+    assert "warning" not in captured.err
 
 
 def _one_capture_global(fake_port, tmp_path, lpf_reply: bytes, *args: str):
@@ -132,7 +148,7 @@ def _one_capture_global(fake_port, tmp_path, lpf_reply: bytes, *args: str):
     replies = [SYNC, INFO, b"OK\n"]
     if "--bandwidth-mhz" in args:
         replies.append(b"OK\n")
-    replies += [b"OK\n", LIMITS_C3, lpf_reply, data_reply(ZERO_BODY, 256), b"OK\n"]
+    replies += [b"OK\n", LIMITS_C3, lpf_reply, GAIN_HW, data_reply(ZERO_BODY, 256), b"OK\n"]
     port = fake_port(*replies)
     assert run("PORT", "-n", "256", *args, "-o", str(tmp_path / "cap")) == 0
     return lines(port), json.loads((tmp_path / "cap.sigmf-meta").read_text())["global"]
@@ -142,7 +158,8 @@ def test_without_bandwidth_records_lpf_code_and_unknown_mhz(fake_port, tmp_path)
     # The browser viewer set 20 MHz earlier; the firmware kept capacitor code 40.
     sent, g = _one_capture_global(fake_port, tmp_path, b"LPF 40 34 34\n")
     assert sent == [
-        "SYNC 1", "INFO", "FREQ 2492", "GAIN HARDWARE", "LIMITS?", "LPF?", "CAP20 256 0", "RELEASE"
+        "SYNC 1", "INFO", "FREQ 2492", "GAIN HARDWARE", "LIMITS?", "LPF?", "GAIN?", "CAP20 256 0",
+        "RELEASE",
     ]  # fmt: skip
     assert not any(ln.startswith("BANDWIDTH") for ln in sent)
     assert g["snappnt:analog_bandwidth_mhz"] is None
@@ -177,7 +194,8 @@ def test_firmware_without_lpf_query_records_unknown_and_still_captures(fake_port
 def test_each_recording_gets_the_lpf_reply_sent_just_before_it(fake_port, tmp_path):
     # Another client changed the setting between the two captures (after the hold lapsed).
     replies = [SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3]
-    replies += [LPF, data_reply(ZERO_BODY, 256), b"LPF 40 34 34\n", data_reply(ZERO_BODY, 256)]
+    replies += [LPF, GAIN_HW, data_reply(ZERO_BODY, 256), b"LPF 40 34 34\n", GAIN_HW]
+    replies += [data_reply(ZERO_BODY, 256)]
     fake_port(*replies, b"OK\n")
     assert run("PORT", "-n", "256", "--count", "2", "-o", str(tmp_path / "r")) == 0
     codes = [
@@ -187,6 +205,83 @@ def test_each_recording_gets_the_lpf_reply_sent_just_before_it(fake_port, tmp_pa
         for i in range(2)
     ]
     assert codes == [0, 40]
+
+
+def test_count_two_queries_gain_before_each_capture_and_records_each_reply(
+    fake_port, tmp_path, capsys
+):
+    # Another program set manual gain 12 between the two captures.
+    replies = [SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3]
+    replies += [LPF, GAIN_HW, data_reply(ZERO_BODY, 256)]
+    replies += [LPF, b"GAIN MANUAL 12 0 79 0\n", data_reply(ZERO_BODY, 256), b"OK\n"]
+    port = fake_port(*replies)
+    assert run("PORT", "-n", "256", "--count", "2", "-o", str(tmp_path / "g")) == 0
+    assert lines(port) == [
+        "SYNC 1",
+        "INFO",
+        "FREQ 2492",
+        "GAIN HARDWARE",
+        "LIMITS?",
+        "LPF?",
+        "GAIN?",
+        "CAP20 256 0",
+        "LPF?",
+        "GAIN?",
+        "CAP20 256 0",
+        "RELEASE",
+    ]
+    metas = [
+        json.loads((tmp_path / f"g_{i:04d}.sigmf-meta").read_text())["global"] for i in range(2)
+    ]
+    assert [m["snappnt:espsdr_gain_reply"] for m in metas] == [
+        "GAIN HARDWARE -1 0 79 0",
+        "GAIN MANUAL 12 0 79 0",
+    ]
+    assert [m["snappnt:espsdr_gain_mode"] for m in metas] == ["hardware", "manual"]
+    assert [m["snappnt:espsdr_gain_index"] for m in metas] == [None, 12]
+    # The requested setting is kept as requested.
+    assert [m["snappnt:gain_mode"] for m in metas] == ["hardware", "hardware"]
+    err = capsys.readouterr().err
+    assert "warning: capture 2 of 2" in err
+    assert "capture 1 of 2" not in err
+
+
+def test_firmware_without_gain_query_records_unknown_and_still_captures(
+    fake_port, tmp_path, capsys
+):
+    fake_port(
+        SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, b"ERR command\n",
+        data_reply(ZERO_BODY, 256), b"OK\n",
+    )  # fmt: skip
+    assert run("PORT", "-n", "256", "-o", str(tmp_path / "cap")) == 0
+    g = json.loads((tmp_path / "cap.sigmf-meta").read_text())["global"]
+    assert g["snappnt:espsdr_gain_reply"] == "ERR command"
+    assert g["snappnt:espsdr_gain_mode"] is None
+    assert g["snappnt:espsdr_gain_index"] is None
+    assert (tmp_path / "cap.sigmf-data").stat().st_size == 256 * 4
+    assert "warning" not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected"),
+    [
+        ("GAIN HARDWARE -1 0 79 0", GainState("hardware", None, 79, 0)),
+        ("GAIN MANUAL 30 0 79 0\n", GainState("manual", 30, 79, 0)),
+        ("GAIN MANUAL 0 0 79 1", GainState("manual", 0, 79, 1)),
+        ("GAIN MANUAL 79 0 79 0", GainState("manual", 79, 79, 0)),
+        ("GAIN MANUAL 80 0 79 0", None),
+        ("GAIN MANUAL -1 0 79 0", None),
+        ("GAIN HARDWARE 40 0 79 0", None),
+        ("GAIN MANUAL 30 1 79 0", None),
+        ("GAIN MANUAL 30 0 79 2", None),
+        ("GAIN AUTO -1 0 79 0", None),
+        ("GAIN MANUAL 30 0 79", None),
+        ("ERR command", None),
+        ("OK", None),
+    ],
+)
+def test_parse_gain_reply(reply, expected):
+    assert parse_gain_reply(reply) == expected
 
 
 @pytest.mark.parametrize(
@@ -210,17 +305,20 @@ def test_parse_lpf_reply(reply, expected):
 
 def test_count_three_writes_numbered_files_with_own_time_and_gain(fake_port, tmp_path):
     replies = [SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3]
-    replies += [LPF, data_reply(ZERO_BODY, 256)] * 3 + [b"OK\n"]
+    replies += [LPF, GAIN_30, data_reply(ZERO_BODY, 256)] * 3 + [b"OK\n"]
     port = fake_port(*replies)
     out = tmp_path / "run"
     assert run("PORT", "-n", "256", "--count", "3", "--gain", "30", "-o", str(out)) == 0
     assert [ln for ln in lines(port) if ln.startswith(("CAP", "GAIN", "LPF"))] == [
         "GAIN MANUAL 30",
         "LPF?",
+        "GAIN?",
         "CAP20 256 0",
         "LPF?",
+        "GAIN?",
         "CAP20 256 0",
         "LPF?",
+        "GAIN?",
         "CAP20 256 0",
     ]
     times = []
@@ -228,6 +326,9 @@ def test_count_three_writes_numbered_files_with_own_time_and_gain(fake_port, tmp
         meta = json.loads((tmp_path / f"run_{i:04d}.sigmf-meta").read_text())
         assert meta["global"]["snappnt:gain_mode"] == "manual"
         assert meta["global"]["snappnt:gain_index"] == 30
+        assert meta["global"]["snappnt:espsdr_gain_reply"] == "GAIN MANUAL 30 0 79 1"
+        assert meta["global"]["snappnt:espsdr_gain_mode"] == "manual"
+        assert meta["global"]["snappnt:espsdr_gain_index"] == 30
         assert meta["captures"][0]["core:datetime"] == meta["global"]["snappnt:host_time_utc"]
         times.append(meta["global"]["snappnt:host_time_utc"])
     assert times == sorted(times)
@@ -249,14 +350,21 @@ def test_rate_not_offered_by_chip_writes_nothing(fake_port, tmp_path, capsys):
 
 
 def test_too_many_samples_writes_nothing(fake_port, tmp_path):
-    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, b"OK\n")
+    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, GAIN_HW, b"OK\n")
     assert run("PORT", "-n", "16384", "-o", str(tmp_path / "c")) == 1
     assert not any(tmp_path.iterdir())
 
 
 def test_damaged_capture_resyncs_and_keeps_earlier_files(fake_port, tmp_path, capsys):
     replies = [SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3]
-    replies += [LPF, data_reply(ZERO_BODY, 256), LPF, data_reply(ZERO_BODY, 256, crc=0)]
+    replies += [
+        LPF,
+        GAIN_HW,
+        data_reply(ZERO_BODY, 256),
+        LPF,
+        GAIN_HW,
+        data_reply(ZERO_BODY, 256, crc=0),
+    ]
     replies += [b"SYNC 99\n", b"OK\n"]
     port = fake_port(*replies)
     assert run("PORT", "-n", "256", "--count", "3", "-o", str(tmp_path / "d")) == 1
@@ -273,7 +381,9 @@ def test_metadata_has_no_port_host_user_or_paths(fake_port, tmp_path, monkeypatc
 
     from tests.test_public_safety import cps
 
-    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, data_reply(ZERO_BODY, 256), b"OK\n")
+    fake_port(
+        SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, GAIN_HW, data_reply(ZERO_BODY, 256), b"OK\n"
+    )
     out = tmp_path / "cap"
     assert run("/dev/ttyPRIVATE0", "-n", "256", "-o", str(out)) == 0
     text = (tmp_path / "cap.sigmf-meta").read_text()
@@ -290,7 +400,9 @@ def test_capture_then_acquire_finds_the_simulated_satellite(fake_port, tmp_path,
     x = x[:16380]
     x = x * (500.0 / np.abs(x).max())  # fit the 10-bit range
     payload = pack10(x)
-    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, data_reply(payload, 16380), b"OK\n")
+    fake_port(
+        SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, GAIN_HW, data_reply(payload, 16380), b"OK\n"
+    )
     out = tmp_path / "snap"
     assert run("PORT", "-n", "16380", "-o", str(out)) == 0
     capsys.readouterr()
@@ -327,7 +439,9 @@ def test_count_refuses_when_a_later_file_exists(fake_port, tmp_path):
 
 def test_overwrite_replaces_existing_output(fake_port, tmp_path):
     (tmp_path / "cap.sigmf-data").write_bytes(b"old")
-    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, data_reply(ZERO_BODY, 256), b"OK\n")
+    fake_port(
+        SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, GAIN_HW, data_reply(ZERO_BODY, 256), b"OK\n"
+    )
     assert run("PORT", "-n", "256", "--overwrite", "-o", str(tmp_path / "cap")) == 0
     assert (tmp_path / "cap.sigmf-data").stat().st_size == 256 * 4
     assert json.loads((tmp_path / "cap.sigmf-meta").read_text())["captures"][0]["core:datetime"]
@@ -342,7 +456,9 @@ def test_write_error_is_reported_and_leaves_no_partial_files(
         raise OSError("disk full")
 
     monkeypatch.setattr(sigmf_io.Path, "write_text", fail)
-    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, data_reply(ZERO_BODY, 256), b"OK\n")
+    fake_port(
+        SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, GAIN_HW, data_reply(ZERO_BODY, 256), b"OK\n"
+    )
     assert run("PORT", "-n", "256", "-o", str(tmp_path / "cap")) == 1
     assert not any(tmp_path.iterdir())
     assert "cannot write capture 1 of 1: disk full" in capsys.readouterr().err
@@ -359,7 +475,9 @@ def test_failed_overwrite_keeps_the_old_recording(fake_port, tmp_path, monkeypat
         raise OSError("disk full")
 
     monkeypatch.setattr(sigmf_io.Path, "write_text", fail)
-    fake_port(SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, data_reply(ZERO_BODY, 256), b"OK\n")
+    fake_port(
+        SYNC, INFO, b"OK\n", b"OK\n", LIMITS_C3, LPF, GAIN_HW, data_reply(ZERO_BODY, 256), b"OK\n"
+    )
     assert run("PORT", "-n", "256", "--overwrite", "-o", str(tmp_path / "cap")) == 1
     monkeypatch.undo()
     assert (tmp_path / "cap.sigmf-data").read_bytes() == b"old"

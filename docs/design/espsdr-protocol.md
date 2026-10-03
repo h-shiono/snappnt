@@ -9,7 +9,8 @@ on hardware in [ESP32-C3 bench checks without an RF source](../results/esp32c3-b
 (issue #41): the replies to `INFO`, `CAPS`, `LIMITS?`, `RANGE?`, `TRANSPORT?`, `GAIN?` and
 `FREQ 2492`; the maximum of 16380 samples per capture (16381 is rejected); the `CAP20` header,
 payload length and CRC-32; and the sign of frequency (the spectrum is not mirrored). The
-replies to `LPF?` were checked in issue #44 (see "Analog low-pass setting"). Everything
+replies to `LPF?` were checked in issue #44 (see "Analog low-pass setting"), and the replies
+to `GAIN?` in manual and hardware mode in issue #51 (see "Capture request"). Everything
 else on this page, and every other chip, has not been verified on hardware. Further hardware
 verification is tracked in issue #11.
 
@@ -48,9 +49,15 @@ a capture command; *word* is one 32-bit entry of the chip's capture memory.
   A longer line is answered with `ERR command_length` (`fw` `main/targets/esp32c3/receiver.c:230`).
 - A partly received line is discarded after 3 s without a byte
   (`fw` `main/common/burst_serial.c:125-128`).
-- One client controls the radio at a time. A second port gets `ERR busy` while the first
-  holds it. The hold ends with `RELEASE` (reply `OK`) or after 5 s without a command
+- One client controls the radio at a time. While a client holds the radio, a command arriving
+  on the other transport (USB or UART) gets `ERR busy`. The hold ends with `RELEASE` (reply `OK`) or after 5 s without a command
   (`fw` `main/targets/esp32c3/receiver.c:225-239`).
+- The hold is kept per transport, USB or UART, not per host program. At commit
+  `550fadea4d00a9e26ce921c5832167becb3dc20c`, `burst_serial_port()` returns the transport on
+  which the last complete line arrived (`main/common/burst_serial.c:99`, `:155`), and the C3
+  receiver compares only that with the holder (`main/targets/esp32c3/receiver.c:276-277`).
+  A second program that opens the same serial device on the host is therefore not refused
+  with `ERR busy`, even while the hold is active.
 - A client must read a complete reply, including the binary payload, before sending the next
   command (`fw` `README.md:68`). After an incomplete transfer, `SYNC <nonce>` is echoed as
   `SYNC <nonce>`, which lets the client find the end of stale bytes
@@ -220,7 +227,21 @@ CAP   <n> <rate-index>      raw 32-bit words
   (`fw` `README.md:68-69`). The reason is a short word, optionally followed by a number.
 - The typical host sequence is (`web` `radio.js:194`):
   `FREQ <MHz>` → `BANDWIDTH <MHz>` (only if a bandwidth is wanted) → `GAIN ...` → `GAIN?`
-  → `CAP20 <n> <rate-index>`. snappnt sends the gain commands only when asked to.
+  → `CAP20 <n> <rate-index>`.
+- `snappnt capture` sends `FREQ`, `BANDWIDTH` (only with `--bandwidth-mhz`) and
+  `GAIN HARDWARE` or `GAIN MANUAL <index>` once per run, then `LPF?`, `GAIN?` and the capture
+  command for every capture, and records both replies in that capture's metadata (decisions
+  D-019 and D-020). The firmware has no query for the tuned frequency: the C3 receiver handles
+  no `FREQ?` (`fw` `main/targets/esp32c3/receiver.c:216-242` at `550fade`), so the frequency
+  in each recording is the one set at the start of the run and is not confirmed before each
+  capture. Re-sending `FREQ` would run the receiver preparation again, including the Wi-Fi
+  channel set-up (`receiver.c:58-81`, `:237-238` at `550fade`).
+- Checked on an ESP32-C3 running firmware of the `550fade` lineage, with `snappnt capture`
+  and two captures per run: `GAIN?` replied `GAIN MANUAL 30 0 79 1` before both captures
+  after `GAIN MANUAL 30`, and `GAIN HARDWARE -1 0 79 0` before both captures after
+  `GAIN HARDWARE`. The last field, bit 23 of the gain register (`main/common/burst_gain.h:49`),
+  was 1 in manual mode and 0 in hardware mode; the firmware does not document its meaning,
+  so snappnt only records it.
 
 ## Data sent to the host
 
