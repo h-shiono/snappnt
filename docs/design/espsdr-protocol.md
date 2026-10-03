@@ -48,8 +48,8 @@ a capture command; *word* is one 32-bit entry of the chip's capture memory.
   A longer line is answered with `ERR command_length` (`fw` `main/targets/esp32c3/receiver.c:230`).
 - A partly received line is discarded after 3 s without a byte
   (`fw` `main/common/burst_serial.c:125-128`).
-- One client controls the radio at a time. A second port gets `ERR busy` while the first
-  holds it. The hold ends with `RELEASE` (reply `OK`) or after 5 s without a command
+- One client controls the radio at a time. While a client holds the radio, a command arriving
+  on the other transport (USB or UART) gets `ERR busy`. The hold ends with `RELEASE` (reply `OK`) or after 5 s without a command
   (`fw` `main/targets/esp32c3/receiver.c:225-239`).
 - The hold is kept per transport, USB or UART, not per host program. At commit
   `550fadea4d00a9e26ce921c5832167becb3dc20c`, `burst_serial_port()` returns the transport on
