@@ -76,10 +76,11 @@ differ, the rulebook wins, except for the limits under "Never".
 3. If no issue is in progress (`status:ready`, `status:plan-proposed`, `status:plan-approved`,
    `status:in-review`) — including when this run has just merged the last one and confirmed its
    issue closed — fetch the open-issue list again (do not reuse the list from step 1), select
-   the next issue by the rulebook's selection rules, add
-   `status:ready`, and post the "Next issue selected" template. Do not select an issue opened
-   by an account other than the repository owner (see "Never"); the maintainer brings such an
-   issue into the workflow by setting a `status:*` label on it.
+   the next issue by the rulebook's selection rules, add `status:ready`, and post the "Next
+   issue selected" template. An issue that the first two items under "Never" say to ignore
+   does not count as in progress, whatever its label, and is never selected: an issue opened by
+   an account other than the repository owner comes into the workflow only when the maintainer
+   adds a `status:*` label to it.
 4. If nothing needs doing, change nothing and post nothing. Many runs are triggered by events
    that need no action; that is expected.
 
