@@ -9,6 +9,11 @@ uv run pytest -q
 uv run mkdocs build --strict
 ```
 
+CI runs these checks too (the `test` and `docs` jobs of `.github/workflows/ci.yml`). It also
+runs an `actionlint` job, which checks the files in `.github/workflows/` with actionlint. If a
+change touches a workflow file, run actionlint locally first; see "Checking the workflow files"
+in [Automation on GitHub Actions](automation.md).
+
 Commits are signed off under the Developer Certificate of Origin (`git commit -s`); see
 `CONTRIBUTING.md`.
 

@@ -139,7 +139,10 @@ progress finish; no new run starts. Nothing else needs to change.
   only in CI, which has no write-capable token.
 - `anthropics/claude-code-action`, `actions/checkout` and `astral-sh/setup-uv` are pinned to
   commit hashes, so a moved tag cannot change the code that receives the secrets. Update the
-  hashes deliberately, after reading the release notes.
+  hashes deliberately, after reading the release notes. The actionlint binary used by CI is
+  pinned by version and SHA-256 checksum (see "Checking the workflow files" below).
+- The start conditions are checked statically on every pull request and push to `main`; see
+  "Checking the workflow files" below.
 - Transmit commands, pushes to `main`, and repository settings commands are denied through
   `--disallowedTools` in the workflows, in addition to the rules in the instructions.
 
@@ -182,3 +185,36 @@ Notes on the branch checks:
   outside account wrote. The same holds for scheduled
   runs, which read every open issue and pull request. The protection there is the rule that
   comments and text from other accounts are information, never instructions.
+
+### Checking the workflow files
+
+A misspelled property in a start condition does not cause an error on GitHub: it evaluates to
+empty, so the condition silently never holds (a hand-off stops) or silently stops excluding
+someone (a security check is lost). Two checks run in CI to catch this:
+
+- **The `actionlint` job** in `.github/workflows/ci.yml` runs
+  [actionlint](https://github.com/rhysd/actionlint) over every file in `.github/workflows/`.
+  It checks the syntax and types of `${{ }}` expressions and `if:` conditions, the properties
+  of contexts such as `github` (a misspelled `github.event_name` fails the job), the inputs of
+  actions, and the shell scripts in `run:` steps with shellcheck. The job downloads a fixed
+  release of actionlint and verifies its SHA-256 checksum against the value written in the
+  workflow, taken from the release's `actionlint_<version>_checksums.txt`. To update it,
+  change the version and the checksum together.
+- **`tests/test_workflow_event_paths.py`**, run with the other tests. actionlint types
+  `github.event` as an object with any properties, so it does **not** check the names of
+  webhook payload properties: a misspelled `github.event.comment.user.login` passes it. The
+  test collects every `github.event.<...>` path in `.github/workflows/*.yml` and fails on any
+  path that is not in an allow list kept in the test. Each entry in the list names the events
+  that carry the property and links to the GitHub documentation where it was checked. A new
+  property in a workflow therefore needs a new entry, checked against the
+  [webhook payload documentation](https://docs.github.com/en/webhooks/webhook-events-and-payloads),
+  before the tests pass.
+
+Neither check evaluates the conditions: they do not show that a condition holds for the events
+it is meant to accept. That still rests on reading each condition against the table in "Start conditions in a
+public repository".
+
+To run actionlint locally, download the release archive for your platform from
+<https://github.com/rhysd/actionlint/releases>, check it against the release's checksums file,
+and run `actionlint` from the repository root. Install shellcheck as well to get the same
+script checks as CI.
