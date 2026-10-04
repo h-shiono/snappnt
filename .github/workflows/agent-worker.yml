@@ -32,25 +32,34 @@ concurrency:
 
 jobs:
   worker:
+    # Labels, comments and review-thread replies start a run only when the repository owner
+    # added or wrote them (the agents act through the owner's token), so nobody else can start
+    # a run by typing a role tag. Events tied to a pull request start a run only for branches of
+    # this repository. docs/development/automation.md lists every start condition and why it is
+    # safe.
     if: >-
       vars.AGENTS_ENABLED == 'true' && (
         github.event_name == 'schedule' ||
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'issues' &&
+          github.event.sender.login == github.repository_owner &&
           (github.event.label.name == 'status:ready' ||
            github.event.label.name == 'status:plan-approved')) ||
         (github.event_name == 'issue_comment' &&
+          github.event.comment.user.login == github.repository_owner &&
           startsWith(github.event.comment.body, '**[orchestrator]**')) ||
         (github.event_name == 'issue_comment' &&
           github.event.issue.pull_request &&
           github.event.comment.user.login == github.repository_owner &&
           !startsWith(github.event.comment.body, '**[')) ||
         (github.event_name == 'pull_request_review_comment' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
           startsWith(github.event.pull_request.head.ref, 'issue-') &&
+          github.event.comment.user.login == github.repository_owner &&
           (startsWith(github.event.comment.body, '**[orchestrator]**') ||
-           (github.event.comment.user.login == github.repository_owner &&
-            !startsWith(github.event.comment.body, '**[')))) ||
+           !startsWith(github.event.comment.body, '**['))) ||
         (github.event_name == 'pull_request_review' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
           startsWith(github.event.pull_request.head.ref, 'issue-') &&
           github.event.review.user.login == 'greptile-apps[bot]')
       )
