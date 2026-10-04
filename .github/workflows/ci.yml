@@ -38,6 +38,31 @@ jobs:
           uv run snappnt sim scenarios/navic_s_esp32c3.yaml -o out/ci_c3
           uv run snappnt acquire out/ci_c3 --prn 10 --freq-span 40000
 
+  # Builds the sdist, then the wheel from that sdist (the default of `uv build`), installs the
+  # wheel into a clean virtual environment and runs the installed command from outside the
+  # source tree. This catches files that the package reads at run time but the wheel lacks.
+  # .github/workflows/publish.yml runs the same check on the files it uploads to PyPI.
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Build sdist and wheel
+        run: uv build -o dist
+      - name: Install the wheel into a clean environment and run it
+        run: |
+          venv="$RUNNER_TEMP/wheel-venv"
+          uv venv "$venv"
+          uv pip install --python "$venv/bin/python" dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$venv/bin/python" -c "import pathlib, snappnt, sys; p = pathlib.Path(snappnt.__file__).resolve(); print(p); sys.exit(not p.is_relative_to(pathlib.Path(sys.prefix).resolve()))"
+          "$venv/bin/snappnt" info
+          "$venv/bin/snappnt" sim "$GITHUB_WORKSPACE/scenarios/navic_s_esp32c3.yaml" -o wheel_c3
+          "$venv/bin/snappnt" acquire wheel_c3 --prn 10 --freq-span 40000
+
   docs:
     runs-on: ubuntu-latest
     steps:

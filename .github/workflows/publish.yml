@@ -1,0 +1,74 @@
+# Publishes snappnt to PyPI when the maintainer publishes a GitHub release.
+#
+# Uploads use PyPI's Trusted Publishing: PyPI accepts them only from this workflow file of this
+# repository, running in the GitHub environment `pypi`, through an OpenID Connect token that
+# GitHub issues for the job. No API token is stored in the repository's secrets. Only the
+# `publish` job may request that token (`id-token: write`); the `build` job, which runs the
+# build backend and the package itself, cannot.
+#
+# The `build` job fails unless the release tag is `v` followed by the version in
+# pyproject.toml, and it runs the built wheel from a clean environment before anything is
+# uploaded. Caching is off, so nothing restored from an earlier run goes into the release.
+# Setup and the release steps: docs/development/automation.md and docs/development/workflow.md.
+name: publish
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: false
+      - name: Check that the release tag matches the version in pyproject.toml
+        # For a release event, GITHUB_REF_NAME is the tag name of the release.
+        run: |
+          version=$(uv run --no-project python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "Release tag '$GITHUB_REF_NAME' does not match version '$version' in pyproject.toml (expected 'v$version')."
+            exit 1
+          fi
+          echo "Release tag '$GITHUB_REF_NAME' matches version '$version'."
+      - name: Build sdist and wheel
+        run: uv build -o dist
+      - name: Install the wheel into a clean environment and run it
+        run: |
+          venv="$RUNNER_TEMP/wheel-venv"
+          uv venv "$venv"
+          uv pip install --python "$venv/bin/python" dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$venv/bin/python" -c "import pathlib, snappnt, sys; p = pathlib.Path(snappnt.__file__).resolve(); print(p); sys.exit(not p.is_relative_to(pathlib.Path(sys.prefix).resolve()))"
+          "$venv/bin/snappnt" info
+          "$venv/bin/snappnt" sim "$GITHUB_WORKSPACE/scenarios/navic_s_esp32c3.yaml" -o wheel_c3
+          "$venv/bin/snappnt" acquire wheel_c3 --prn 10 --freq-span 40000
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/snappnt/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

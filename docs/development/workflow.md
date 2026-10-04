@@ -83,11 +83,21 @@ Steps for a release, in order:
    release).
 3. Zenodo's GitHub integration is enabled for the repository (needed once, before the first
    release).
-4. The maintainer creates the GitHub release `vX.Y.Z`, where `X.Y.Z` is the version in
-   `pyproject.toml`. Zenodo archives it and mints the DOI. A workflow that publishes the same
-   version to PyPI on each GitHub release is planned in issue #67; until that workflow is
-   merged, a GitHub release publishes nothing to PyPI.
-5. After the first release, the concept DOI is added to `CITATION.cff` and to the "Citing"
+4. The Trusted Publisher on pypi.org and the GitHub environment `pypi` are set up (needed
+   once, before the first release; see "Publishing to PyPI" in
+   [Automation on GitHub Actions](automation.md)).
+5. The maintainer creates and publishes the GitHub release `vX.Y.Z`, where `X.Y.Z` is the
+   version in `pyproject.toml`. Zenodo archives it and mints the DOI. The workflow
+   `.github/workflows/publish.yml` starts on the published release: it checks that the tag is
+   `v` followed by the version in `pyproject.toml` and stops otherwise, builds the sdist and
+   the wheel, runs the installed wheel once, and uploads both files to PyPI. If the `pypi`
+   environment has a required reviewer, the upload waits for that approval in the Actions tab.
+   Check afterwards that the run passed and that <https://pypi.org/project/snappnt/> shows the
+   new version. A run that failed before the upload, for example because step 4 was missed,
+   can be re-run from the Actions tab once the cause is fixed. A version number can be
+   uploaded to PyPI only once, so a wrong upload is corrected with a new release and a new
+   version number.
+6. After the first release, the concept DOI is added to `CITATION.cff` and to the "Citing"
    section of the README. The concept DOI does not change with later releases, so this step is
    needed only once.
 
