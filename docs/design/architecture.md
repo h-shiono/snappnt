@@ -100,8 +100,11 @@ stored in an annotation whose `core:label` is `truth`, under the key `snappnt:tr
   bins, and each group uses a replica with chip rate R_c × (1 + f_g / f_c), where f_g is the
   middle of the group measured from the centre frequency of the search. A group is at most
   2 × 0.1 × f_c / (R_c × T) wide, so the code drift left over within a group stays below
-  0.1 chip. For a snapshot of a few milliseconds all bins fall into one group. The code phase
-  is converted from the lag with the chip rate of the group that holds the peak.
+  0.1 chip. For a snapshot of a few milliseconds all bins fall into one group. The groups are
+  processed one at a time (with a Doppler-rate search, all rate hypotheses inside each group),
+  so only one group's replica spectra are in memory. The code phase is converted from the lag
+  with the chip rate of the group that holds the peak. The decision and the alternatives are
+  in D-023 of the [decision log](../project/decisions.md).
 - The option assumes direct reception. With an external mixer the offset at the receiver also
   contains the error of the external LO, which shifts the IF without changing the code rate.
   `snappnt acquire` and `snappnt sweep` therefore stop with an error when the truth annotation

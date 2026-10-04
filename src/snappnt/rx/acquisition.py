@@ -291,7 +291,6 @@ def acquire(
             groups.append((lo, hi, spec.chip_rate_hz * (1.0 + f_group_hz / spec.carrier_hz)))
     else:
         groups = [(0, freqs.size, spec.chip_rate_hz)]
-    group_rep_f = [replica_spectra(rate_hz) for _, _, rate_hz in groups]
 
     if rate_range_hzps is None:
         rates = np.array([doppler_rate_hzps])
@@ -299,19 +298,31 @@ def acquire(
     else:
         rates, used_rate_step = _rate_grid(rate_range_hzps, rate_step_hzps, t_coh, n_blocks)
 
-    # Keep the grid of the rate hypothesis with the highest peak; the noise level and the
-    # refinement use that grid.
-    power = None
-    best_rate = float(rates[0])
+    # Keep the grid of the rate hypothesis with the highest peak (the first one on a tie); the
+    # noise level and the refinement use that grid.
     carriers_hz = freqs + center_offset_hz
-    for rate in rates:
-        parts = [
-            _power_grid(x, fs, carriers_hz[lo:hi], float(rate), rep_f, block, n_blocks, nfft, k)
-            for (lo, hi, _), rep_f in zip(groups, group_rep_f, strict=True)
-        ]
-        grid = parts[0] if len(parts) == 1 else np.concatenate(parts)
-        if power is None or grid.max() > power.max():
-            power, best_rate = grid, float(rate)
+    if len(groups) == 1:
+        rep_f = replica_spectra(groups[0][2])
+        power = None
+        best_rate = float(rates[0])
+        for rate in rates:
+            grid = _power_grid(x, fs, carriers_hz, float(rate), rep_f, block, n_blocks, nfft, k)
+            if power is None or grid.max() > power.max():
+                power, best_rate = grid, float(rate)
+    else:
+        # One group at a time, so that only one group's replica spectra are held in memory; the
+        # rates are searched inside the group loop, so each group's replica is built once.
+        grids = np.empty((rates.size, freqs.size, k), dtype=np.float32)
+        for lo, hi, chip_rate_hz in groups:
+            rep_f = replica_spectra(chip_rate_hz)
+            for i, rate in enumerate(rates):
+                grids[i, lo:hi] = _power_grid(
+                    x, fs, carriers_hz[lo:hi], float(rate), rep_f, block, n_blocks, nfft, k
+                )
+            del rep_f
+        i_best = int(np.argmax(grids.reshape(rates.size, -1).max(axis=1)))
+        power, best_rate = grids[i_best].copy(), float(rates[i_best])
+        del grids
 
     # Noise level: mean power away from the peak (exclude +/-1 chip and +/-1 frequency bin).
     fi, ki = np.unravel_index(np.argmax(power), power.shape)
