@@ -51,7 +51,15 @@ jobs:
           "$venv/bin/python" -c "import pathlib, snappnt, sys; p = pathlib.Path(snappnt.__file__).resolve(); print(p); sys.exit(not p.is_relative_to(pathlib.Path(sys.prefix).resolve()))"
           "$venv/bin/snappnt" info
           "$venv/bin/snappnt" sim "$GITHUB_WORKSPACE/scenarios/navic_s_esp32c3.yaml" -o wheel_c3
-          "$venv/bin/snappnt" acquire wheel_c3 --prn 10 --freq-span 40000
+          "$venv/bin/snappnt" acquire wheel_c3 --prn 10 --freq-span 40000 > acquire.txt
+          cat acquire.txt
+          # `snappnt acquire` exits with 0 whether or not it detects anything. The scenario has
+          # a fixed seed and C/N0 58 dB-Hz, so PRN 10 must be detected ("yes") and match the
+          # simulator's truth ("OK" in the last column).
+          if ! awk '$1 == "10" && $2 == "yes" && $NF == "OK" {found = 1} END {exit !found}' acquire.txt; then
+            echo "PRN 10 was not detected, or its result does not match the simulator's truth."
+            exit 1
+          fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist

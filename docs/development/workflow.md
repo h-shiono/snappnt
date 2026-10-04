@@ -93,10 +93,16 @@ Steps for a release, in order:
    the wheel, runs the installed wheel once, and uploads both files to PyPI. If the `pypi`
    environment has a required reviewer, the upload waits for that approval in the Actions tab.
    Check afterwards that the run passed and that <https://pypi.org/project/snappnt/> shows the
-   new version. A run that failed before the upload, for example because step 4 was missed,
-   can be re-run from the Actions tab once the cause is fixed. A version number can be
-   uploaded to PyPI only once, so a wrong upload is corrected with a new release and a new
-   version number.
+   new version. If the run fails, what to do depends on the step that failed:
+   - The tag check: the release tag does not match the version in `pyproject.toml`. A re-run
+     uses the same tag and fails again. Publish a new release whose tag matches; if the
+     version in `pyproject.toml` is the wrong one, change it in a pull request first and then
+     release the new version.
+   - The upload, for example because step 4 was missed: nothing reached PyPI. Fix the cause
+     and re-run the failed jobs from the Actions tab.
+
+   A version number can be uploaded to PyPI only once, even after it is deleted there, so a
+   wrong upload is corrected with a new release and a new version number.
 6. After the first release, the concept DOI is added to `CITATION.cff` and to the "Citing"
    section of the README. The concept DOI does not change with later releases, so this step is
    needed only once.

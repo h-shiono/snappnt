@@ -135,7 +135,7 @@ runs in it, and agents never create releases (see "Releases" in
 
 | Job | Permissions | Steps |
 |---|---|---|
-| `build` | `contents: read` | Checks out the release tag. Fails unless the tag is `v` followed by `project.version` in `pyproject.toml` (tag `v0.1.0` for version `0.1.0`). Builds the sdist and, from the sdist, the wheel (`uv build`). Installs the wheel into a clean virtual environment and runs `snappnt info`, `snappnt sim` and `snappnt acquire` from outside the source tree. Stores the two files as a workflow artifact. |
+| `build` | `contents: read` | Checks out the release tag. Fails unless the tag is `v` followed by `project.version` in `pyproject.toml` (tag `v0.1.0` for version `0.1.0`). Builds the sdist and, from the sdist, the wheel (`uv build`). Installs the wheel into a clean virtual environment and runs `snappnt info`, `snappnt sim` and `snappnt acquire` from outside the source tree; fails unless `snappnt acquire` detects the simulated satellite and its result matches the simulator's truth. Stores the two files as a workflow artifact. |
 | `publish` | `id-token: write` | Runs in the GitHub environment `pypi`. Downloads the artifact and uploads it with `pypa/gh-action-pypi-publish`. Does not check out the repository. |
 
 The upload uses PyPI's
