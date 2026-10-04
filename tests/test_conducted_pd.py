@@ -229,6 +229,15 @@ def test_estimate_cn0_needs_two_blocks():
         cpd.estimate_cn0(x, 4e6, _spec_navic(), 10, carrier_hz=0.0, n_blocks=10)
 
 
+def test_cn0_command_fails_when_no_segment_gives_an_estimate(tmp_path):
+    # 2.5005 MSa/s gives 2500.5 samples per 1 ms code period: every segment is refused, so
+    # the command must not report success.
+    x = np.ones(20_000, dtype=np.complex64)
+    write_sigmf(tmp_path / "odd", x, 2.5005e6, center_frequency_hz=2.49e9)
+    argv = ["cn0", str(tmp_path / "odd"), "--carrier-hz", "0", "--blocks", "4"]
+    assert cpd.main(argv) == 1
+
+
 def test_load_set_rejects_mixed_sample_rates(tmp_path):
     d = tmp_path / "mixed"
     d.mkdir()

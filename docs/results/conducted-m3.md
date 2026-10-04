@@ -336,10 +336,10 @@ the mean over the segments and the standard error of that mean.
   and 0.38 ± 0.16 dB at 50 dB-Hz**. The two are the same within their errors: about 0.4 dB is
   lost in the generator chain, independent of C/N0 in this range. The recordings cannot tell
   whether the loss is in the B210 clone or in the HackRF.
-- The playback file itself is 0.14 to 0.2 dB below the scenario value (60.05 for an ideal
-  20 MSa/s signal against 59.79; 49.86 against 50). These differences are about the size of
-  their errors; they are attributed to the band limiting of a signal generated at 8 MSa/s, as
-  an estimate.
+- The playback file itself reads 0.26 dB below an ideal 20 MSa/s signal at 60 dB-Hz (59.79
+  against 60.05) and 0.14 dB below the scenario value at 50 dB-Hz (49.86 against 50). These
+  differences are about the size of their errors (0.15 to 0.27 dB); they are attributed to the
+  band limiting of a signal generated at 8 MSa/s, as an estimate.
 
 ## Where the 0.7 dB comes from
 
@@ -347,10 +347,10 @@ Estimated contributions near 50 to 52 dB-Hz, where the 50 % and 90 % points are:
 
 | Contribution | Estimate [dB] | How it was obtained |
 |---|---|---|
-| Playback file generated at 8 MSa/s | 0.14 to 0.2 | M2M4 estimate of the playback file against the scenario value and against an ideal 20 MSa/s signal |
+| Playback file generated at 8 MSa/s | 0.14 to 0.26 (errors 0.15 to 0.27) | M2M4 estimate of the playback file against the scenario value at 50 dB-Hz and against an ideal 20 MSa/s signal at 60 dB-Hz |
 | Generator chain (B210 clone and HackRF together) | about 0.4 (± 0.16) | M2M4 estimate, HackRF recording against playback file, at 50 and 60 dB-Hz; includes any loss in the HackRF, so it is an upper bound for the generator alone |
 | Carrier between grid points | about 0.16 | The measured carrier is 0.33 bin from the nearest grid point (sinc² loss 0.38 dB); in the simulation it is 0.25 bin away (12 ppm at 2492.028 MHz is −29.9 kHz on a 2441.4 Hz grid; loss 0.22 dB) |
-| **Sum** | **about 0.7 to 0.8** | |
+| **Sum** | **about 0.7 to 0.8** (0.14 + 0.4 + 0.16 to 0.26 + 0.4 + 0.16) | |
 
 The sum is close to the measured shift of 0.7 dB, which leaves little for the XIAO's own
 receiver chain (gain, 14 MHz analog filter, DC removal, its oscillators) beyond what the

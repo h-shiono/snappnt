@@ -53,6 +53,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from fractions import Fraction
@@ -630,6 +631,9 @@ def cmd_cn0(a: argparse.Namespace) -> int:
             f"{fs / 1e6:g} MSa/s, carrier {r['carrier_hz']:.0f} Hz, code drift "
             f"{r['code_drift_chips_per_s']:+.3f} chip/s, C/N0 estimate {r['cn0_dbhz']:.2f} dB-Hz"
         )
+    if not values:
+        print(f"{path.name}: no segment gave an estimate", file=sys.stderr)
+        return 1
     if len(values) > 1:
         v = np.array(values)
         sd = v.std(ddof=1)
