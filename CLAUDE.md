@@ -91,6 +91,4 @@ Before finishing any change, all of these must pass (run through `uv run`): `ruf
 
 ## Open questions (update when settled)
 
-- Exact ESP-SDR tuning and capture commands and host transfer format (`io/espsdr_client.py`) — issue #6
 - Whether low sample rates on ESP32-C61 are clock division only, without band limiting — issue #3. The ESP-SDR firmware has no decimation or filter step of its own; whether the capture hardware band-limits is not documented there (see docs/design/esp32c61-capture.md). Settled only by the technical reference manual or a separate ESP32-C61 hardware test (noise floor and tone alias at each rate index).
-- Reference receiver specifications (`frontend/devices/b206mini_i.yaml`)

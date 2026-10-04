@@ -1,7 +1,9 @@
 # USRP B206mini-i. Reference receiver on the splitter's second port during conducted tests.
+# The values below have not been checked against a datasheet. No code or test uses this file;
+# `snappnt info` only lists its name.
 name: b206mini_i
 kind: uhd
 role: reference_receiver
-tune_range_hz: [70000000, 6000000000]   # TODO: confirm from datasheet
+tune_range_hz: [70000000, 6000000000]   # not checked
 adc_bits: 12
-reference_input: "TODO: confirm"
+reference_input: "not checked"

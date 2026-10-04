@@ -165,8 +165,11 @@ uv run python tools/sky_link_budget.py --antenna-gain-dbic 3 --antenna-temp-k 10
   minimum).
 - **Receiver NF.** TODO: the noise figure of the ESP32 radio at its antenna pin is not given
   in any document this project has found. It is shown as 5, 10 and 15 dB. The conducted test
-  (issue #11) can measure it: a known input level and the measured C/N0 give the noise figure
-  through the conducted-test calculator (`snappnt link-budget`).
+  (issue #11) did not measure it: the input level at the ESP32 was not known, because no power
+  meter or calibrated noise source was available ([Conducted test (M3)](../results/conducted-m3.md),
+  "Not verified"). A known input level at the antenna pin, set with a power meter or a
+  calibrated noise source, together with the C/N0 measured from the captures, would give the
+  noise figure through the conducted-test calculator (`snappnt link-budget`).
 - **Implementation losses** after the receiver input (quantisation, filtering, short
   snapshots) are not part of this calculation; they are included in the simulated detection
   curves that the result is compared with.
