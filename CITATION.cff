@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use snappnt in published work, please cite it as below."
+type: software
+title: snappnt
+version: 0.1.0
+license: BSD-2-Clause
+repository-code: "https://github.com/h-shiono/snappnt"
+abstract: >-
+  snappnt pairs a signal simulator with a snapshot acquisition engine, so that
+  short captures from cheap radios (ESP32 chips running ESPARGOS ESP-SDR,
+  HackRF, USRP) can be processed and checked against known truth. The first
+  target is the NavIC S-band Standard Positioning Service signal at
+  2492.028 MHz, which an ESP32's own 2.4 GHz radio can receive without a mixer.
+keywords:
+  - GNSS
+  - PNT
+  - NavIC
+  - LEO-PNT
+  - SDR
+  - ESP32
+  - snapshot receiver
+authors:
+  - given-names: Hayato  # public-safety: ignore
+    family-names: Shiono  # public-safety: ignore
+    alias: h-shiono
+    orcid: "https://orcid.org/0009-0005-3547-4198"

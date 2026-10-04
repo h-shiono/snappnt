@@ -49,6 +49,13 @@ SNAPPNT_PRIVATE_TERMS=~/.config/snappnt/private-terms.txt python tools/check_pub
 
 This can be added as a local git pre-commit hook.
 
+`CITATION.cff` names the maintainer on purpose, because a citation needs an author and the
+maintainer chose to publish their name there. The maintainer's own private-terms list may
+contain that name, so the two name lines in `CITATION.cff` carry the `public-safety: ignore`
+marker. The marker covers only those two lines. Other files carry the GitHub handle and the
+copyright line in `LICENSE`, without the marker, so a list entry that also matches those (for
+example the family name alone, which is part of the handle) is still reported there.
+
 ## Photos
 
 A photo taken with a phone or camera usually carries EXIF metadata: often the GPS position

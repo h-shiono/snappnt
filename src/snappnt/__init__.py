@@ -9,4 +9,4 @@ Layers (see docs/design/architecture.md):
   eval      detection-probability sweeps and truth comparison
 """
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"

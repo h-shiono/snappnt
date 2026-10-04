@@ -8,7 +8,9 @@ parameters it used (code phase, frequency offset, C/N0), so every processing ste
 checked automatically against known truth.
 
 !!! note "Status"
-    Pre-alpha. Not affiliated with ESPARGOS or Espressif.
+    Research software, early stage. The receive chain has been verified in a conducted test
+    (cables and attenuators, nothing radiated). **No satellite signal has been received from the
+    sky yet.** Not affiliated with ESPARGOS or Espressif.
 
 ## Why snapshots
 

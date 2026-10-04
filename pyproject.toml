@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "snappnt"
-version = "0.0.1"
+version = "0.1.0"
 description = "Snapshot PNT receiver toolkit for low-cost front ends (ESP32 ESP-SDR, HackRF, USRP): signal simulator and acquisition"
 readme = "README.md"
 license = "BSD-2-Clause"
@@ -13,7 +13,7 @@ requires-python = ">=3.11"
 authors = [{ name = "h-shiono" }]
 keywords = ["GNSS", "PNT", "NavIC", "LEO-PNT", "SDR", "ESP32", "snapshot receiver"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering",
 ]
