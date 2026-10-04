@@ -203,10 +203,13 @@ someone (a security check is lost). Two checks run in CI to catch this:
 - **`tests/test_workflow_event_paths.py`**, run with the other tests. actionlint types
   `github.event` as an object with any properties, so it does **not** check the names of
   webhook payload properties: a misspelled `github.event.comment.user.login` passes it. The
-  test collects every `github.event.<...>` path in `.github/workflows/*.yml` and fails on any
-  path that is not in an allow list kept in the test. Each entry in the list names the events
-  that carry the property and links to the GitHub documentation where it was checked. A new
-  property in a workflow therefore needs a new entry, checked against the
+  test reads every expression in `.github/workflows/*.yml` (each `if:` condition and the text
+  inside each `${{ }}`; YAML comments and string literals are skipped), collects every
+  `github.event.<...>` path in them, and fails on any path that is not in an allow list kept
+  in the test. GitHub matches property names without regard to case, so the test compares
+  paths in lower case. Each entry in the list names the events that carry the property and
+  links to the GitHub documentation where it was checked. A new property in a workflow
+  therefore needs a new entry, checked against the
   [webhook payload documentation](https://docs.github.com/en/webhooks/webhook-events-and-payloads),
   before the tests pass.
 

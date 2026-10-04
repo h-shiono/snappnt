@@ -4,9 +4,9 @@ actionlint (run by the `actionlint` job in `.github/workflows/ci.yml`) types `gi
 an object with any properties, so a misspelled webhook payload property such as
 `github.event.comment.user.logn` passes it and evaluates to empty on GitHub. A start condition
 of an agent workflow that compares such a property then silently never holds, or silently
-stops excluding someone. This test closes that gap: each path used in `.github/workflows/*.yml`
-must be in `ALLOWED_PATHS`, and each entry there was checked by hand against GitHub's
-documentation.
+stops excluding someone. This test closes that gap: each path used in an expression in
+`.github/workflows/*.yml` must be in `ALLOWED_PATHS`, and each entry there was checked by hand
+against GitHub's documentation.
 
 Adding an entry: open the section of the event in "Webhook events and payloads" and follow the
 property down to the last name. Where the webhook documentation does not list the properties
@@ -17,6 +17,8 @@ object; check the property there and link that page too.
 import re
 from pathlib import Path
 from typing import NamedTuple
+
+import yaml
 
 WORKFLOWS_DIR = Path(__file__).resolve().parents[1] / ".github" / "workflows"
 
@@ -94,32 +96,68 @@ ALLOWED_PATHS: dict[str, Entry] = {
 }
 
 # `github.event.` followed by dot-separated property names. `github.event_name` does not match.
-_PATH = re.compile(r"\bgithub\.event((?:\.[A-Za-z_][A-Za-z0-9_-]*)+)")
+# GitHub resolves context and property names without regard to case (`GitHub.Event.Comment`
+# works), so matching ignores case and paths are compared in lower case.
+_PATH = re.compile(r"\bgithub\.event((?:\.[A-Za-z_][A-Za-z0-9_-]*)+)", re.IGNORECASE)
 # Index (`github['event']`, `github.event['x']`) and object filter (`.*`) syntax would let a
 # path past the allow list, so the workflows must not use them on `github.event`.
-_OTHER_SYNTAX = re.compile(r"\bgithub\s*\[|\bgithub\.event(?:\.[A-Za-z0-9_-]+)*\s*(?:\[|\.\*)")
+_OTHER_SYNTAX = re.compile(
+    r"\bgithub\s*\[|\bgithub\.event(?:\.[A-Za-z0-9_-]+)*\s*(?:\[|\.\*)", re.IGNORECASE
+)
+# A string literal in an expression; GitHub writes a quote inside one as ''.
+_STRING_LITERAL = re.compile(r"'(?:[^']|'')*'")
+_EMBEDDED = re.compile(r"\$\{\{(.*?)\}\}", re.DOTALL)
 
 
-def scan(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
-    """Return (line, path) for each event path and (line, text) for each unsupported syntax."""
-    paths, other = [], []
-    for lineno, line in enumerate(text.splitlines(), start=1):
-        paths += [(lineno, "github.event" + m.group(1)) for m in _PATH.finditer(line)]
-        other += [(lineno, m.group(0)) for m in _OTHER_SYNTAX.finditer(line)]
-    return paths, other
+def scan(expression: str) -> tuple[list[str], list[str]]:
+    """Return the event paths and the unsupported syntax in one expression.
+
+    String literals are blanked first, so text such as `'github.event.x'` is not a path.
+    """
+    code = _STRING_LITERAL.sub("''", expression)
+    paths = ["github.event" + m.group(1).lower() for m in _PATH.finditer(code)]
+    return paths, [m.group(0) for m in _OTHER_SYNTAX.finditer(code)]
 
 
-def _workflow_files() -> list[Path]:
+def expressions(node, where: str = "") -> list[tuple[str, str]]:
+    """Return (location, expression) for each expression in a parsed workflow file.
+
+    An `if:` value is an expression as a whole, with or without `${{ }}`; elsewhere only the
+    text inside `${{ }}` is. YAML comments are dropped by the parser and plain text is skipped,
+    so only what GitHub evaluates is checked.
+    """
+    found: list[tuple[str, str]] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            here = f"{where}.{key}" if where else str(key)
+            if key == "if" and isinstance(value, str) and "${{" not in value:
+                found.append((here, value))
+            else:
+                found += expressions(value, here)
+    elif isinstance(node, list):
+        for i, value in enumerate(node):
+            found += expressions(value, f"{where}[{i}]")
+    elif isinstance(node, str):
+        found += [(where, m.group(1)) for m in _EMBEDDED.finditer(node)]
+    return found
+
+
+def _workflow_expressions() -> list[tuple[str, str]]:
     files = sorted(WORKFLOWS_DIR.glob("*.yml")) + sorted(WORKFLOWS_DIR.glob("*.yaml"))
     assert files, f"no workflow files found in {WORKFLOWS_DIR}"
-    return files
+    found = []
+    for f in files:
+        doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        found += [(f"{f.name}: {where}", expr) for where, expr in expressions(doc)]
+    return found
 
 
 def _used_paths() -> dict[str, list[str]]:
     used: dict[str, list[str]] = {}
-    for f in _workflow_files():
-        for lineno, path in scan(f.read_text(encoding="utf-8"))[0]:
-            used.setdefault(path, []).append(f"{f.name}:{lineno}")
+    for where, expr in _workflow_expressions():
+        for path in scan(expr)[0]:
+            if where not in used.setdefault(path, []):
+                used[path].append(where)
     return used
 
 
@@ -132,11 +170,7 @@ def test_every_event_path_is_in_the_allow_list():
 
 
 def test_no_index_or_filter_syntax_on_github_event():
-    found = {
-        f"{f.name}:{lineno}": text
-        for f in _workflow_files()
-        for lineno, text in scan(f.read_text(encoding="utf-8"))[1]
-    }
+    found = [(where, text) for where, expr in _workflow_expressions() for text in scan(expr)[1]]
     assert not found, f"use dot syntax for github.event paths: {found}"
 
 
@@ -147,24 +181,33 @@ def test_every_allow_list_entry_is_used():
 
 def test_allow_list_entries_name_events_and_documentation():
     for path, entry in ALLOWED_PATHS.items():
+        assert path == path.lower(), path
         assert entry.events, path
         assert entry.docs and all(d.startswith("https://docs.github.com/") for d in entry.docs)
 
 
-def test_scan_finds_paths_and_ignores_other_context_properties():
-    text = (
-        "if: github.event_name == 'issues' && github.event.issue.pull_request &&\n"
-        "  startsWith(github.event.comment.body, '**[') || github.repository_owner\n"
+def test_scan_finds_paths_and_ignores_other_context_properties_and_literals():
+    expr = (
+        "github.event_name == 'github.event.not.a.path' && GitHub.Event.Issue.Pull_Request &&\n"
+        "  startsWith(github.event.comment.body, '**[it''s]') || github.repository_owner\n"
     )
-    paths, other = scan(text)
-    assert paths == [(1, "github.event.issue.pull_request"), (2, "github.event.comment.body")]
-    assert other == []
+    assert scan(expr) == (["github.event.issue.pull_request", "github.event.comment.body"], [])
 
 
 def test_scan_reports_index_and_filter_syntax():
-    text = (
-        "a: ${{ github.event['comment'] }}\n"
-        "b: ${{ github['event'] }}\n"
-        "c: ${{ github.event.labels.*.name }}\n"
+    for expr in ("github.event['comment']", "github['event']", "GITHUB.event.labels.*.name"):
+        assert scan(expr)[1], expr
+
+
+def test_expressions_reads_if_conditions_and_embedded_expressions_only():
+    doc = yaml.safe_load(
+        "# github.event.in.a.comment\n"
+        "jobs:\n"
+        "  a:\n"
+        "    if: github.event.label.name == 'x'\n"
+        "    steps:\n"
+        "      - if: ${{ github.event.action == 'created' }}\n"
+        "        run: echo github.event.plain.text ${{ github.event.issue.number }}\n"
     )
-    assert [lineno for lineno, _ in scan(text)[1]] == [1, 2, 3]
+    paths = [p for _, expr in expressions(doc) for p in scan(expr)[0]]
+    assert paths == ["github.event.label.name", "github.event.action", "github.event.issue.number"]
