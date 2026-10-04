@@ -28,7 +28,7 @@ Terms used on this page:
 
 ```
 B210 clone, TRX1 port ─ 30 dB ─ 20 dB ─ 10 dB ─ DC block ─ SMA to U.FL cable ─ XIAO ESP32C3
-TRX2, RX1, RX2 of the B210 clone: 50 Ω loads
+TRX2, RX1, RX2 of the B210 clone: 50 Ω loads (as stated by the maintainer for the runs)
 ```
 
 | Item | Value |
@@ -92,7 +92,7 @@ the generator's band (89 PSD bins of 78.1 kHz).
   decision D-012.
 - With the generator off the standard deviation of each component was about 5.2 (10-bit
   scale); at gain 60, about 32, with extremes from −142 to +122. No sample reached −512 or 511
-  in any capture of this page.
+  in any of the 2 180 captures kept from this test (extremes over all of them: −204 and +192).
 - No narrow line was found in the generator-on PSD (local maxima more than 8 dB above a
   running median over 31 bins). In particular no line was seen at 2493.5 MHz (+1.5 MHz in the
   XIAO's baseband), where the B210 clone shows a spur in receive.
@@ -281,7 +281,8 @@ One in place of the XIAO, with the same attenuators and DC block and the same tr
 | Length | 10 s at 20 MSa/s, signed 8-bit; converted with `snappnt convert --format hackrf` |
 | Transfer rate | 39.3 to 40.6 MB/s in every second of every recording (no lost samples) |
 
-- First tries at `-l 32 -g 20` gave a generator-off standard deviation of 0.95 counts, with
+- First tries at `-l 32 -g 20` gave a generator-off standard deviation of the complex samples of
+  0.95 counts (about 0.67 per component), with
   almost all samples at 0, 1 or 2: quantisation, not the HackRF's noise. At `-l 40 -g 40`,
   0.4 % of generator-on samples were at the ends of the 8-bit range. `-g 34` was used.
 - In-band rise on the HackRF (generator-off recording against the 60 and 50 dB-Hz

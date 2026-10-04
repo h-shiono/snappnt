@@ -196,7 +196,8 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
 - **Verified on hardware** in the conducted test of issue #11
   ([Conducted test of NavIC S-band SPS on the XIAO ESP32C3](../results/conducted-m3.md)): on one
   XIAO ESP32C3, 2 180 captures kept (of 2 200 taken) with `--gain 60 --bandwidth-mhz 14` at 2492 MHz, each with
-  `GAIN MANUAL 60 0 79 1` and `LPF 63 34 34` recorded; the NavIC signal was acquired in them.
+  `GAIN MANUAL 60 0 79 1` and `LPF 63 34 34` recorded; the NavIC signal was acquired in the
+  captures taken while a signal was played.
 
 ## Practical notes from the first test
 
