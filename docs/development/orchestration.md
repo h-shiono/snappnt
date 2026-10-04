@@ -83,7 +83,7 @@ The orchestrator merges a pull request when **all** of these hold:
 2. The pull request comes from a branch of this repository (not a fork) named
    `issue-<number>-...` for the linked issue.
 3. Every job of the `ci` workflow (tests on all Python versions, public-safety check, docs
-   build) has passed on the exact head commit being merged, and the branch has no conflict
+   build, actionlint) has passed on the exact head commit being merged, and the branch has no conflict
    with `main`. The orchestrator relies on CI for this and never checks out or runs pull request
    code itself: its session holds a write-capable token, and CI runs without one.
 4. Greptile has completed a review of that same head commit, no Greptile finding is left
@@ -190,7 +190,7 @@ then post a plan here.
 
 **Merging** head commit <sha>, branch `issue-<n>-...` of this repository.
 
-- CI on <sha>: test (3.11), test (3.12), test (3.13), docs — all passed
+- CI on <sha>: test (3.11), test (3.12), test (3.13), docs, actionlint — all passed
 - Greptile review of <sha>: completed
 - Acceptance criteria:
   - <criterion>: <how it was verified, with numbers or test names>
