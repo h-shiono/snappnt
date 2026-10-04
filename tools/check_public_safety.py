@@ -8,20 +8,22 @@ Generic patterns only (see docs/development/public-safety.md). In text files:
   * the SigMF key core:geolocation
 
 In image files (JPEG, PNG, WebP, TIFF), the metadata a camera or phone writes:
-  * any GPS data (an entry in the EXIF GPS IFD, exif:GPS* properties in XMP, PNG text
-    keywords exif:GPS*)
+  * any GPS data (an entry in the EXIF GPS IFD, XMP properties GPS*, PNG text keywords
+    exif:GPS*)
   * EXIF date/time (DateTime, DateTimeOriginal, DateTimeDigitized, also as PNG text keywords
-    exif:DateTime*), the XMP creation date, and the PNG text keyword "Creation Time"
-  * camera make and model (EXIF Make and Model, XMP tiff:Make and tiff:Model, PNG text
+    exif:DateTime*), the XMP properties CreateDate, DateCreated, DateTimeOriginal and
+    DateTimeDigitized, and the PNG text keyword "Creation Time"
+  * camera make and model (EXIF Make and Model, XMP properties Make and Model, PNG text
     keywords exif:Make and exif:Model)
-EXIF is read from JPEG APP1 segments (including those of further images appended after the
-main one), PNG eXIf chunks and "Raw profile type exif" text chunks, WebP EXIF chunks, and TIFF
-files. An EXIF block without these tags (for example Orientation only) is not a finding. The
-PNG text keywords "date:create", "date:modify" and "date:timestamp" and the PNG tIME chunk,
-which ImageMagick and other tools write with the time they wrote the file, are not findings on
-purpose: they say when the file was written, not when or where a photo was taken. Metadata
-that cannot be parsed is a finding, because it cannot be shown to be clean. HEIC, HEIF and AVIF
-files are not parsed and are always findings. Parsing uses the standard library only.
+XMP properties are matched by name after any namespace prefix. EXIF and XMP are read from JPEG APP1
+segments (including those of further images appended after the main one), PNG eXIf chunks and text
+chunks, WebP EXIF and XMP chunks, and TIFF files (including the XMP tag). An EXIF block without
+these tags (for example Orientation only) is not a finding. The PNG text keywords "date:create",
+"date:modify" and "date:timestamp" and the PNG tIME chunk, which ImageMagick and other tools write
+with the time they wrote the file, are not findings on purpose: they say when the file was written,
+not when or where a photo was taken. Metadata that cannot be parsed is a finding, because it cannot
+be shown to be clean. HEIC, HEIF and AVIF files are not parsed and are always findings. Parsing uses
+the standard library only.
 
 Optional: SNAPPNT_PRIVATE_TERMS=<file outside the repository> adds case-insensitive terms,
 one per line. That file must never be committed.
@@ -77,14 +79,20 @@ GPS_IFD_TAG = 0x8825
 DATE_TAGS = {0x0132, 0x9003, 0x9004}  # DateTime, DateTimeOriginal, DateTimeDigitized
 CAMERA_TAGS = {0x010F, 0x0110}  # Make, Model
 EXIF_HEADER = b"Exif\x00\x00"
-EMBEDDED_EXIF = re.compile(rb"\xff\xe1..Exif\x00\x00(?:II\*\x00|MM\x00\*)", re.DOTALL)
+XMP_TAG = 0x02BC  # XMP packet stored in a TIFF IFD
+XMP_HEADER = b"http://ns.adobe.com/"
+EMBEDDED_APP1 = re.compile(
+    rb"\xff\xe1..(?:Exif\x00\x00(?:II\*\x00|MM\x00\*)|http://ns\.adobe\.com/)", re.DOTALL
+)
+# XMP properties are matched by local name after any namespace prefix: the prefix is only an
+# alias for the namespace URI, so a writer may use "gps:" or "ns1:" as well as "exif:".
 XMP_PATTERNS = (
-    (re.compile(rb"\bexif:GPS[A-Za-z]+"), GPS_FINDING),
+    (re.compile(rb":GPS[A-Za-z]+\b"), GPS_FINDING),
     (
-        re.compile(rb"\b(?:xmp:CreateDate|exif:DateTimeOriginal|exif:DateTimeDigitized)\b"),
+        re.compile(rb":(?:CreateDate|DateCreated|DateTimeOriginal|DateTimeDigitized)\b"),
         DATE_FINDING,
     ),
-    (re.compile(rb"\btiff:(?:Make|Model)\b"), CAMERA_FINDING),
+    (re.compile(rb":(?:Make|Model)\b"), CAMERA_FINDING),
 )
 
 
@@ -150,7 +158,7 @@ def scan_exif(tiff: bytes, reasons: set[str]) -> None:
         (count,) = struct.unpack(order + "H", _take(tiff, offset, 2))
         for i in range(count):
             entry = _take(tiff, offset + 2 + 12 * i, 12)
-            tag, _type, _count, value = struct.unpack(order + "HHII", entry)
+            tag, _type, count_, value = struct.unpack(order + "HHII", entry)
             if kind == "gps":
                 reasons.add(GPS_FINDING)
             if tag in DATE_TAGS:
@@ -161,6 +169,9 @@ def scan_exif(tiff: bytes, reasons: set[str]) -> None:
                 pending.append((value, "exif"))
             elif tag == GPS_IFD_TAG:
                 pending.append((value, "gps"))
+            elif tag == XMP_TAG:  # BYTE or UNDEFINED: inline if it fits in 4 bytes
+                inline = count_ <= 4
+                scan_xmp(entry[8 : 8 + count_] if inline else _take(tiff, value, count_), reasons)
         if kind == "main":
             next_at = offset + 2 + 12 * count
             if next_at + 4 <= len(tiff):
@@ -190,14 +201,18 @@ def _scan_jpeg(data: bytes, reasons: set[str]) -> None:
         payload = _take(data, pos + 4, length - 2)
         if marker == 0xE1 and payload.startswith(EXIF_HEADER):
             scan_exif(payload, reasons)
-        elif marker == 0xE1 and payload.startswith(b"http://ns.adobe.com/"):
+        elif marker == 0xE1 and payload.startswith(XMP_HEADER):
             scan_xmp(payload, reasons)
         pos += 2 + length
     # Phones append further JPEG images after the main one (MPF: previews, depth or gain maps),
-    # each with its own EXIF segment. Look for those after the main image's metadata.
-    for m in EMBEDDED_EXIF.finditer(data, pos):
+    # each with its own EXIF and XMP segments. Look for those after the main image's metadata.
+    for m in EMBEDDED_APP1.finditer(data, pos):
         (length,) = struct.unpack(">H", data[m.start() + 2 : m.start() + 4])
-        scan_exif(_take(data, m.start() + 4, length - 2), reasons)
+        payload = _take(data, m.start() + 4, length - 2)
+        if payload.startswith(EXIF_HEADER):
+            scan_exif(payload, reasons)
+        else:
+            scan_xmp(payload, reasons)
 
 
 def _png_text(ctype: bytes, payload: bytes) -> tuple[str, bytes]:
@@ -221,7 +236,10 @@ def _raw_profile(text: bytes) -> bytes:
     lines = text.split()
     if len(lines) < 2:
         raise ValueError("raw profile without a length")
-    return bytes.fromhex(b"".join(lines[2:]).decode("ascii"))
+    data = bytes.fromhex(b"".join(lines[2:]).decode("ascii"))
+    if len(data) != int(lines[1]):
+        raise ValueError("raw profile shorter or longer than its declared length")
+    return data
 
 
 def _scan_exif_keyword(name: str, reasons: set[str]) -> None:

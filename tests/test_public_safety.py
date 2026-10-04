@@ -122,12 +122,13 @@ def png_text(keyword, text):
     return _chunk(b"tEXt", keyword.encode("latin-1") + b"\x00" + text.encode("latin-1"))
 
 
-def raw_profile(tiff):
+def raw_profile(tiff, declared_length=None):
     """The value ImageMagick writes for the PNG text keyword "Raw profile type exif"."""
     data = cps.EXIF_HEADER + tiff
     hexdata = data.hex()
     lines = "\n".join(hexdata[i : i + 72] for i in range(0, len(hexdata), 72))
-    return f"\nexif\n{len(data):8d}\n{lines}\n"
+    length = len(data) if declared_length is None else declared_length
+    return f"\nexif\n{length:8d}\n{lines}\n"
 
 
 def write_and_scan(tmp_path, name, data):
@@ -176,6 +177,34 @@ def test_jpeg_xmp_with_gps_is_a_finding(tmp_path):
     assert write_and_scan(tmp_path, "xmp.jpg", jpeg_bytes(_segment(0xE1, xmp))) == [cps.GPS_FINDING]
 
 
+@pytest.mark.parametrize(
+    ("prop", "reason"),
+    [
+        (b'gps:GPSLatitude="12,30.0N"', cps.GPS_FINDING),
+        (b'ns1:GPSLongitude="45,30.0E"', cps.GPS_FINDING),
+        (b'photoshop:DateCreated="2026-01-01"', cps.DATE_FINDING),
+        (b'cam:Model="X"', cps.CAMERA_FINDING),
+    ],
+)
+def test_jpeg_xmp_with_any_prefix_is_a_finding(tmp_path, prop, reason):
+    xmp = b"http://ns.adobe.com/xap/1.0/\x00<x:xmpmeta><rdf:Description " + prop + b"/></x:xmpmeta>"
+    assert write_and_scan(tmp_path, "xmp.jpg", jpeg_bytes(_segment(0xE1, xmp))) == [reason]
+
+
+def test_jpeg_xmp_without_listed_properties_passes(tmp_path):
+    xmp = (
+        b"http://ns.adobe.com/xap/1.0/\x00<x:xmpmeta><rdf:Description "
+        b'xmp:CreatorTool="Editor" tiff:Orientation="1"/></x:xmpmeta>'
+    )
+    assert write_and_scan(tmp_path, "xmp.jpg", jpeg_bytes(_segment(0xE1, xmp))) == []
+
+
+def test_jpeg_embedded_image_with_xmp_gps_is_a_finding(tmp_path):
+    xmp = b'http://ns.adobe.com/xap/1.0/\x00<rdf:Description exif:GPSLatitude="1"/>'
+    data = jpeg_bytes() + jpeg_bytes(_segment(0xE1, xmp))
+    assert write_and_scan(tmp_path, "mpf.jpg", data) == [cps.GPS_FINDING]
+
+
 def test_jpeg_embedded_image_with_gps_is_a_finding(tmp_path):
     # A second JPEG appended after the main image, as in MPF files written by phones.
     data = jpeg_bytes() + jpeg_bytes(exif_segment(GPS_TIFF))
@@ -202,6 +231,13 @@ def test_png_raw_profile_is_a_finding(tmp_path):
     chunk = png_text("Raw profile type exif", raw_profile(DATE_CAMERA_TIFF))
     reasons = write_and_scan(tmp_path, "raw.png", png_bytes(chunk))
     assert reasons == sorted([cps.CAMERA_FINDING, cps.DATE_FINDING])
+
+
+def test_png_raw_profile_with_wrong_length_is_a_finding(tmp_path):
+    # Declared longer than the hex data, as when the value was cut short.
+    text = raw_profile(tiff_bytes(ifd0=[ORIENTATION]), declared_length=1000)
+    chunk = png_text("Raw profile type exif", text)
+    assert write_and_scan(tmp_path, "raw.png", png_bytes(chunk)) == [cps.UNREADABLE_FINDING]
 
 
 def test_png_compressed_xmp_with_camera_is_a_finding(tmp_path):
@@ -248,6 +284,17 @@ def test_webp_exif_with_gps_is_a_finding(tmp_path):
 def test_tiff_with_camera_is_a_finding(tmp_path):
     data = tiff_bytes(ifd0=[MAKE, ORIENTATION])
     assert write_and_scan(tmp_path, "camera.tif", data) == [cps.CAMERA_FINDING]
+
+
+def test_tiff_xmp_tag_with_gps_is_a_finding(tmp_path):
+    xmp = b'<x:xmpmeta><rdf:Description exif:GPSLatitude="12,30.0N"/></x:xmpmeta>'
+
+    def build(offset):
+        entry = (cps.XMP_TAG, 7, len(xmp), struct.pack("<I", offset))
+        return tiff_bytes(ifd0=[ORIENTATION, entry])
+
+    data = build(len(build(0))) + xmp
+    assert write_and_scan(tmp_path, "xmp.tif", data) == [cps.GPS_FINDING]
 
 
 def test_unknown_image_format_is_a_finding(tmp_path):
