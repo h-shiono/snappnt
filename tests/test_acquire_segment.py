@@ -100,3 +100,34 @@ def test_cli_segment_past_end(tmp_path, capsys, start_s, duration_s):
     assert captured.out == ""
     assert "error: segment from" in captured.err
     assert "not within the recording, which holds 32736 samples" in captured.err
+
+
+@pytest.mark.parametrize(
+    ("start_s", "duration_s"),
+    [(float("inf"), None), (float("nan"), None), (0.0, float("inf")), (0.1, float("nan"))],
+)
+def test_read_segment_not_finite(tmp_path, start_s, duration_s):
+    base = write_sigmf(tmp_path / "x", np.ones(1000, np.complex64), 1e3)
+    with pytest.raises(ValueError, match="must be a finite number of seconds"):
+        read_sigmf(base, start_s=start_s, duration_s=duration_s)
+
+
+@pytest.mark.parametrize("option", ["--start-s", "--duration-s"])
+@pytest.mark.parametrize("value", ["inf", "nan"])
+def test_cli_segment_not_finite(tmp_path, capsys, option, value):
+    out = _recording(tmp_path)
+    capsys.readouterr()
+    assert main(["acquire", str(out), "--prn", "10", option, value]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "error: segment" in captured.err
+    assert "must be a finite number of seconds" in captured.err
+
+
+def test_read_segment_short_read(tmp_path, monkeypatch):
+    # A file that shrinks between the size check and the read gives fewer samples.
+    base = write_sigmf(tmp_path / "x", np.ones(1000, np.complex64), 1e3)
+    fromfile = np.fromfile
+    monkeypatch.setattr(sigmf_io.np, "fromfile", lambda *a, **k: fromfile(*a, **k)[:-1])
+    with pytest.raises(ValueError, match="read 499 samples of the segment from sample 250"):
+        read_sigmf(base, start_s=0.25, duration_s=0.5)
