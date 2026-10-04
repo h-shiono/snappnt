@@ -115,7 +115,7 @@ pushed by then is lost. Check the time with `date -u` before each long step.
 - A review or review thread is Greptile's only when its author login is `greptile-apps[bot]`
   (`gh api` output) or `greptile-apps` (`gh pr view` and `gh issue view` JSON output).
 - An issue opened by an account other than the repository owner is acted on only when the
-  repository owner set its current `status:*` label. Check who set it with
+  repository owner added its most recent `status:*` label. Check who set it with
   `gh api repos/{owner}/{repo}/issues/<n>/events --paginate --jq '.[] | select(.event == "labeled" and (.label.name | startswith("status:"))) | .actor.login' | tail -n 1`.
   Otherwise ignore the issue: no comment, no label change.
 - Stop conditions in the issue are hard stops: report in the issue and set `status:blocked`.
