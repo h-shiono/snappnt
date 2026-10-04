@@ -31,30 +31,35 @@ concurrency:
 
 jobs:
   orchestrator:
+    # Comments and review-thread replies start a run only when the repository owner wrote them
+    # (the agents post through the owner's token), so nobody else can start a run by typing a
+    # role tag. Events tied to a pull request start a run only for branches of this repository.
+    # docs/development/automation.md lists every start condition and why it is safe.
     if: >-
       vars.AGENTS_ENABLED == 'true' && (
         github.event_name == 'schedule' ||
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'issue_comment' &&
           github.event.action == 'created' &&
-          startsWith(github.event.comment.body, '**[worker]**')) ||
-        (github.event_name == 'issue_comment' &&
-          github.event.action == 'created' &&
           github.event.comment.user.login == github.repository_owner &&
-          !startsWith(github.event.comment.body, '**[')) ||
+          (startsWith(github.event.comment.body, '**[worker]**') ||
+           !startsWith(github.event.comment.body, '**['))) ||
         (github.event_name == 'issue_comment' &&
           github.event.issue.pull_request &&
           github.event.comment.user.login == 'greptile-apps[bot]' &&
           contains(github.event.comment.body, 'greptile_summary') &&
           contains(github.event.comment.body, 'Last reviewed commit')) ||
         (github.event_name == 'pull_request_review_comment' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.comment.user.login == github.repository_owner &&
           (startsWith(github.event.comment.body, '**[worker]**') ||
-           (github.event.comment.user.login == github.repository_owner &&
-            !startsWith(github.event.comment.body, '**[')))) ||
+           !startsWith(github.event.comment.body, '**['))) ||
         (github.event_name == 'pull_request_review' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
           github.event.review.user.login == 'greptile-apps[bot]') ||
         (github.event_name == 'workflow_run' &&
-          github.event.workflow_run.event == 'pull_request')
+          github.event.workflow_run.event == 'pull_request' &&
+          github.event.workflow_run.head_repository.full_name == github.repository)
       )
     runs-on: ubuntu-latest
     timeout-minutes: 30

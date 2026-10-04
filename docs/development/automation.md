@@ -9,8 +9,15 @@ costs.
 
 | Workflow | Role | Instructions | Started by |
 |---|---|---|---|
-| `.github/workflows/agent-worker.yml` | Worker | `.github/agents/worker.md` | `status:ready` or `status:plan-approved` label added; a comment or review-thread reply tagged `**[orchestrator]**`; an untagged comment or review-thread reply by the repository owner on a pull request; a Greptile review; hourly at minute 40; manual |
-| `.github/workflows/agent-orchestrator.yml` | Orchestrator | `.github/agents/orchestrator.md` | A comment or review-thread reply tagged `**[worker]**`; an untagged comment by the repository owner; a Greptile review; the `ci` workflow finishing on a pull request; hourly at minute 10; manual |
+| `.github/workflows/agent-worker.yml` | Worker | `.github/agents/worker.md` | `status:ready` or `status:plan-approved` label added by the repository owner; a comment or review-thread reply by the repository owner tagged `**[orchestrator]**`; an untagged comment or review-thread reply by the repository owner on a pull request; a Greptile review; hourly at minute 40; manual |
+| `.github/workflows/agent-orchestrator.yml` | Orchestrator | `.github/agents/orchestrator.md` | A comment or review-thread reply by the repository owner tagged `**[worker]**`; an untagged comment by the repository owner; a Greptile review; the `ci` workflow finishing on a pull request from a branch of this repository; hourly at minute 10; manual |
+
+The agents post, label and push through the repository owner's token (see "Why a personal
+access token" below), so their comments and labels are authored by the owner's account. Every
+start condition on a comment or label therefore requires the owner as author, tagged or not.
+The one exception is the orchestrator's start on Greptile's review summary comment, which
+requires `greptile-apps[bot]` as author. See "Start conditions in a public repository" under
+"Security notes".
 
 Both run `anthropics/claude-code-action` in automation mode (a `prompt` is given, so it does
 not wait for an `@claude` mention), pinned to a release commit. Each run starts from a fresh
@@ -123,10 +130,10 @@ progress finish; no new run starts. Nothing else needs to change.
 
 - The agents act with the personal access token's permissions. Keep it limited to this
   repository and give it an expiry date.
-- The workflows only start on comments from the repository owner or tagged agent comments, but
-  the agents read every comment on an issue. Both are instructed to treat only untagged
-  comments by the repository owner's account as instructions; comments from any other account
-  are information. Revisit these workflows before publication, when anyone can comment.
+- The workflows start only on events listed in "Start conditions in a public repository"
+  below. The agents still read every comment on an issue or pull request. Both are instructed
+  to treat only untagged comments by the repository owner's account as instructions; comments
+  from any other account are information.
 - The orchestrator's checkout keeps no git credentials, it never checks out pull request code,
   and it merges only branches of this repository named after the issue. Pull request code runs
   only in CI, which has no write-capable token.
@@ -135,3 +142,43 @@ progress finish; no new run starts. Nothing else needs to change.
   hashes deliberately, after reading the release notes.
 - Transmit commands, pushes to `main`, and repository settings commands are denied through
   `--disallowedTools` in the workflows, in addition to the rules in the instructions.
+
+### Start conditions in a public repository
+
+Once the repository is public, anyone with a GitHub account can open issues, comment, review,
+reply in review threads, and open pull requests from forks. Only accounts with triage access or
+more can add labels, and only accounts with write access can edit another account's comment.
+Each start condition below holds only when `AGENTS_ENABLED` is `true`, and is safe for these
+reasons:
+
+| Workflow | Event | Condition | Why an outside account cannot meet it |
+|---|---|---|---|
+| Both | `schedule` | Hourly | Not caused by any account. Scheduled runs use the workflow file on `main`. |
+| Both | `workflow_dispatch` | Manual start | Needs write access to the repository. |
+| Worker | `issues` (`labeled`) | Label `status:ready` or `status:plan-approved`, added by the repository owner (`sender`) | Outside accounts cannot add labels, and the issue template applies no labels. The owner check also covers anyone given triage access later. |
+| Worker | `issue_comment` | Body starts with `**[orchestrator]**`, author is the repository owner | Author check. |
+| Worker | `issue_comment` | On a pull request, untagged, author is the repository owner | Author check. |
+| Worker | `pull_request_review_comment` | Branch of this repository named `issue-...`, author is the repository owner, tagged `**[orchestrator]**` or untagged | Author check and branch check. |
+| Worker | `pull_request_review` | Branch of this repository named `issue-...`, reviewer is `greptile-apps[bot]` | Reviewer check and branch check. |
+| Orchestrator | `issue_comment` (`created`) | Body starts with `**[worker]**` or is untagged, author is the repository owner | Author check. |
+| Orchestrator | `issue_comment` (`created` or `edited`) | On a pull request, author is `greptile-apps[bot]`, body is Greptile's summary | Author check. `comment.user` is the comment's author, not whoever edited it, and only accounts with write access can edit another account's comment. |
+| Orchestrator | `pull_request_review_comment` | Branch of this repository, author is the repository owner, tagged `**[worker]**` or untagged | Author check and branch check. |
+| Orchestrator | `pull_request_review` | Branch of this repository, reviewer is `greptile-apps[bot]` | Reviewer check and branch check. |
+| Orchestrator | `workflow_run` (`ci` completed) | The `ci` run was for a pull request from a branch of this repository (`workflow_run.head_repository`) | Only accounts with write access can push branches to this repository. Without this check a pull request from a fork would start the orchestrator: a `workflow_run` run gets the secrets even when the run that triggered it came from a fork (GitHub documentation, "Events that trigger workflows"). |
+
+Notes on the branch checks:
+
+- For `pull_request_review` and `pull_request_review_comment` on a pull request from a fork,
+  GitHub passes no secrets to the run, so such a run could not act anyway. The branch check
+  (`pull_request.head.repo.full_name` equal to this repository) makes the workflow skip it
+  instead of starting a run that fails.
+- An `issue_comment` event carries no branch information. It runs in the context of the
+  default branch of this repository (GitHub documentation, "Events that trigger workflows"),
+  not of the fork, so it gets the secrets even on a pull request from a fork. If Greptile
+  reviews a pull request from a fork, its summary comment there starts the orchestrator
+  (TODO: not checked whether Greptile reviews pull requests from forks; settled by opening one
+  from a test fork). That run never checks out pull request code and merges only branches of
+  this repository named after the issue, but it does read the pull request's text, which an
+  outside account wrote. The same holds for scheduled
+  runs, which read every open issue and pull request. The protection there is the rule that
+  comments and text from other accounts are information, never instructions.
