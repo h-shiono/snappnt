@@ -99,6 +99,7 @@ def cmd_sim(a: argparse.Namespace) -> int:
 
 def cmd_acquire(a: argparse.Namespace) -> int:
     from snappnt.eval import is_correct
+    from snappnt.eval.pd_curve import CODE_DOPPLER_LO_ERROR
     from snappnt.io import get_truth, read_sigmf
     from snappnt.rx import acquire
     from snappnt.signals import load_signal
@@ -111,6 +112,9 @@ def cmd_acquire(a: argparse.Namespace) -> int:
         print("error: --signal is required (no truth annotation to read it from)", file=sys.stderr)
         return 2
     spec = load_signal(signal)
+    if a.code_doppler and ((truth or {}).get("frequency_plan") or {}).get("lo_hz") is not None:
+        print(f"error: {CODE_DOPPLER_LO_ERROR}", file=sys.stderr)
+        return 2
     center = (truth or {}).get("baseband_offset_hz", 0.0) if a.center is None else a.center
     prns = _parse_prns(a.prn) if a.prn else list(spec.prns())
     truth_by_prn = {s["prn"]: s for s in (truth or {}).get("satellites", [])}
@@ -125,6 +129,7 @@ def cmd_acquire(a: argparse.Namespace) -> int:
             n_blocks=a.blocks,
             pfa=a.pfa,
             remove_dc=a.remove_dc,
+            code_doppler=a.code_doppler,
         )  # fmt: skip
         t = truth_by_prn.get(prn)
         mark = ""
@@ -140,9 +145,13 @@ def cmd_acquire(a: argparse.Namespace) -> int:
 
 def cmd_sweep(a: argparse.Namespace) -> int:
     from snappnt.eval import sweep, write_csv
+    from snappnt.eval.pd_curve import CODE_DOPPLER_LO_ERROR
     from snappnt.sim import load_scenario
 
     scn = load_scenario(a.scenario)
+    if a.code_doppler and scn.frequency_plan is not None and scn.frequency_plan.lo_hz is not None:
+        print(f"error: {CODE_DOPPLER_LO_ERROR}", file=sys.stderr)
+        return 2
     pts = sweep(
         scn,
         _parse_range(a.cn0),
@@ -152,6 +161,7 @@ def cmd_sweep(a: argparse.Namespace) -> int:
         pfa=a.pfa,
         seed=a.seed,
         remove_dc=a.remove_dc,
+        code_doppler=a.code_doppler,
     )
     print(" C/N0   Pd     Pwrong  metric")
     for p in pts:
@@ -400,6 +410,11 @@ def build_parser() -> argparse.ArgumentParser:
             choices=("none", "mean", "linear"),
             default="none",
             help="subtract the DC offset estimated from the snapshot before acquisition",
+        )
+        s.add_argument(
+            "--code-doppler",
+            action="store_true",
+            help="scale the replica chip rate with the frequency bin (direct reception only)",
         )
         s.set_defaults(func=func)
 

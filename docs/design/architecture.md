@@ -89,6 +89,25 @@ stored in an annotation whose `core:label` is `truth`, under the key `snappnt:tr
   anywhere in the search grid equals `pfa`. It assumes independent search cells; issue #1
   checks this assumption by measurement.
 - The C/N0 estimate ignores losses and therefore reads low. Issue #4 measures the bias.
+- Code Doppler (option `code_doppler`, command-line `--code-doppler`). By default one code
+  replica at the nominal chip rate serves every frequency bin. In direct reception, one crystal
+  drives both the LO and the ADC, so a carrier offset Δf (from satellite Doppler and from the
+  receiver clock error together) comes with a change of the code rate, relative to the sample
+  clock, of Δf / f_c, where f_c is the carrier frequency. Over a snapshot of length T the code
+  drifts by Δf / f_c × R_c × T chips, where R_c is the nominal chip rate. For NavIC S-band at
+  Δf = 25 kHz and T = 0.2 s this is about 2 chips, which spreads the correlation peak over
+  several lags. With the option on, the frequency bins are split into groups of neighbouring
+  bins, and each group uses a replica with chip rate R_c × (1 + f_g / f_c), where f_g is the
+  middle of the group measured from the centre frequency of the search. A group is at most
+  2 × 0.1 × f_c / (R_c × T) wide, so the code drift left over within a group stays below
+  0.1 chip. For a snapshot of a few milliseconds all bins fall into one group. The code phase
+  is converted from the lag with the chip rate of the group that holds the peak.
+- The option assumes direct reception. With an external mixer the offset at the receiver also
+  contains the error of the external LO, which shifts the IF without changing the code rate.
+  `snappnt acquire` and `snappnt sweep` therefore stop with an error when the truth annotation
+  or the scenario has a frequency plan with `lo_hz`. A recording without a truth annotation
+  carries no frequency plan, so the check cannot be made, and the option is applied as for
+  direct reception.
 
 ## Terms used in this project
 

@@ -31,7 +31,17 @@ Doppler rate: by default one hypothesis, ``doppler_rate_hzps``. With ``rate_rang
 whole grid is computed for each rate hypothesis, and the peak is the maximum over all
 (rate, frequency, lag) cells. The false-alarm threshold counts the rate hypotheses.
 
-Not yet modelled: code Doppler within the snapshot (negligible for captures of a few ms).
+Code Doppler: by default one replica at the nominal chip rate serves every frequency bin. With
+``code_doppler=True`` the frequency bins are split into groups, and each group uses a replica
+whose chip rate is scaled by ``1 + f_group / carrier_hz``, where ``f_group`` is the middle of
+the group measured from ``center_offset_hz``. This assumes direct reception with one crystal
+for the LO and the ADC (the clock model in ``sim/generate.py``): a carrier offset ``f`` then
+comes with a code-rate change of ``f / carrier_hz`` relative to the sample clock, from both
+satellite Doppler and receiver clock error. Groups are at most ``2 * 0.1 * carrier_hz /
+(chip_rate_hz * t_snap)`` wide for snapshot length ``t_snap``, so the code drift left over
+within a group stays below 0.1 chip over the snapshot. It does not hold with an external mixer,
+whose LO error moves the IF without changing the code rate; callers that know the frequency
+plan reject that case.
 """
 
 from __future__ import annotations
@@ -224,6 +234,7 @@ def acquire(
     rate_range_hzps: tuple[float, float] | None = None,
     rate_step_hzps: float | None = None,
     remove_dc: str = "none",
+    code_doppler: bool = False,
 ) -> AcqResult:
     """Search one PRN.
 
@@ -244,6 +255,11 @@ def acquire(
     ``remove_dc`` (``"none"``, ``"mean"`` or ``"linear"``) subtracts an estimate of the receiver's
     DC offset from the snapshot before correlation; see ``remove_dc_offset``. The default
     ``"none"`` leaves the snapshot as it is. Any other value raises ``ValueError``.
+
+    ``code_doppler`` scales the replica chip rate with the frequency bin, in groups of bins (see
+    the module docstring). It is meant for direct reception only. The reported code phase is
+    converted from the lag with the chip rate of the peak's group. With a short snapshot all bins
+    fall into one group, whose chip rate is set by the middle of ``freq_range_hz``.
     """
     x = remove_dc_offset(x, remove_dc)
     n = x.size
@@ -254,13 +270,28 @@ def acquire(
     freqs = np.arange(freq_range_hz[0], freq_range_hz[1] + step / 2, step)
 
     code = get_code(spec, prn)
-    rep = _replica(code, spec.chip_rate_hz, fs, n + k)
     # Each block only needs the replica segment it can overlap: [start, start + block + k).
     nfft = 1 << int(np.ceil(np.log2(2 * block + k)))
-    rep_f = [
-        sp_fft.fft(rep[b * block : b * block + block + k], nfft).astype(np.complex64)
-        for b in range(n_blocks)
-    ]
+
+    def replica_spectra(chip_rate_hz: float) -> list[np.ndarray]:
+        rep = _replica(code, chip_rate_hz, fs, n + k)
+        return [
+            sp_fft.fft(rep[b * block : b * block + block + k], nfft).astype(np.complex64)
+            for b in range(n_blocks)
+        ]
+
+    # Groups of frequency bins as (first bin, stop bin, chip rate); one group without code Doppler.
+    if code_doppler:
+        half_width_hz = 0.1 * spec.carrier_hz / (spec.chip_rate_hz * (n / fs))
+        bins_per_group = max(1, int(np.floor(2.0 * half_width_hz / step)) + 1)
+        groups = []
+        for lo in range(0, freqs.size, bins_per_group):
+            hi = min(lo + bins_per_group, freqs.size)
+            f_group_hz = 0.5 * (freqs[lo] + freqs[hi - 1])
+            groups.append((lo, hi, spec.chip_rate_hz * (1.0 + f_group_hz / spec.carrier_hz)))
+    else:
+        groups = [(0, freqs.size, spec.chip_rate_hz)]
+    group_rep_f = [replica_spectra(rate_hz) for _, _, rate_hz in groups]
 
     if rate_range_hzps is None:
         rates = np.array([doppler_rate_hzps])
@@ -272,10 +303,13 @@ def acquire(
     # refinement use that grid.
     power = None
     best_rate = float(rates[0])
+    carriers_hz = freqs + center_offset_hz
     for rate in rates:
-        grid = _power_grid(
-            x, fs, freqs + center_offset_hz, float(rate), rep_f, block, n_blocks, nfft, k
-        )
+        parts = [
+            _power_grid(x, fs, carriers_hz[lo:hi], float(rate), rep_f, block, n_blocks, nfft, k)
+            for (lo, hi, _), rep_f in zip(groups, group_rep_f, strict=True)
+        ]
+        grid = parts[0] if len(parts) == 1 else np.concatenate(parts)
         if power is None or grid.max() > power.max():
             power, best_rate = grid, float(rate)
 
@@ -298,6 +332,7 @@ def acquire(
     cn0 = 10.0 * np.log10(snr / t_coh)
 
     lag = float(ki)
+    peak_chip_rate_hz = next(rate_hz for lo, hi, rate_hz in groups if lo <= fi < hi)
     freq_hz = float(freqs[fi])
     if refine:
         lag += parabolic_offset(power[fi, (ki - 1) % k], power[fi, ki], power[fi, (ki + 1) % k])
@@ -307,7 +342,7 @@ def acquire(
     return AcqResult(
         prn=prn,
         detected=metric > thr,
-        code_phase_chips=float((lag * spec.chip_rate_hz / fs) % spec.code_length),
+        code_phase_chips=float((lag * peak_chip_rate_hz / fs) % spec.code_length),
         freq_offset_hz=freq_hz,
         metric=metric,
         threshold=thr,
