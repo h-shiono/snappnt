@@ -126,6 +126,42 @@ progress finish; no new run starts. Nothing else needs to change.
   shared with any other use of that plan.
 - **Scheduled workflows** run from the default branch only.
 
+## Publishing to PyPI
+
+`.github/workflows/publish.yml` uploads snappnt to [PyPI](https://pypi.org/project/snappnt/)
+when the maintainer publishes a GitHub release. It is not an agent workflow: no Claude session
+runs in it, and agents never create releases (see "Releases" in
+[Contributing and workflow](workflow.md)).
+
+| Job | Permissions | Steps |
+|---|---|---|
+| `build` | `contents: read` | Checks out the release tag. Fails unless the tag is `v` followed by `project.version` in `pyproject.toml` (tag `v0.1.0` for version `0.1.0`). Builds the sdist and, from the sdist, the wheel (`uv build`). Installs the wheel into a clean virtual environment and runs `snappnt info`, `snappnt sim` and `snappnt acquire` from outside the source tree; fails unless `snappnt acquire` detects the simulated satellite and its result matches the simulator's truth. Stores the two files as a workflow artifact. |
+| `publish` | `id-token: write` | Runs in the GitHub environment `pypi`. Downloads the artifact and uploads it with `pypa/gh-action-pypi-publish`. Does not check out the repository. |
+
+The upload uses PyPI's
+[Trusted Publishing](https://docs.pypi.org/trusted-publishers/): the `publish` job asks GitHub
+for an OpenID Connect token that names this repository, the workflow file `publish.yml` and
+the environment `pypi`, and PyPI accepts the upload only if those match the publisher
+registered for the project. No PyPI API token is stored in the repository's secrets.
+
+The same install-and-run check runs on every pull request as the `wheel` job of
+`.github/workflows/ci.yml`, so a file missing from the wheel is found before a release.
+
+### Setup (maintainer, once before the first release)
+
+1. On pypi.org, with two-factor authentication enabled on the account, add a pending Trusted
+   Publisher ("Publishing" in the account settings) for the project `snappnt`: owner
+   `h-shiono`, repository `snappnt`, workflow `publish.yml`, environment `pypi`. A pending
+   publisher turns into the project's publisher on the first upload, which creates the
+   project.
+2. In the GitHub repository settings, under "Environments", create the environment `pypi`.
+   Optionally add the maintainer as a required reviewer; the `publish` job then waits for
+   approval in the Actions tab before it receives the token and uploads.
+
+Until both are done, the `publish` job of a release fails at the upload and nothing reaches
+PyPI. A version once uploaded cannot be uploaded again, even after it is deleted on PyPI, so a
+broken release is fixed with a new version number.
+
 ## Security notes
 
 - The agents act with the personal access token's permissions. Keep it limited to this
@@ -138,9 +174,21 @@ progress finish; no new run starts. Nothing else needs to change.
   and it merges only branches of this repository named after the issue. Pull request code runs
   only in CI, which has no write-capable token.
 - `anthropics/claude-code-action`, `actions/checkout` and `astral-sh/setup-uv` are pinned to
-  commit hashes, so a moved tag cannot change the code that receives the secrets. Update the
-  hashes deliberately, after reading the release notes. The actionlint binary used by CI is
+  commit hashes, so a moved tag cannot change the code that receives the secrets. The actions
+  used by `publish.yml` (`actions/upload-artifact`, `actions/download-artifact` and
+  `pypa/gh-action-pypi-publish`) are pinned the same way. Update the hashes deliberately,
+  after reading the release notes. The actionlint binary used by CI is
   pinned by version and SHA-256 checksum (see "Checking the workflow files" below).
+- `publish.yml` starts only when a GitHub release is published, which needs write access to
+  the repository; issues, comments and pull requests from other accounts cannot start it. Its
+  top-level permissions are empty. Only the `publish` job may request an OpenID Connect token
+  (`id-token: write`), and that job runs no code from the repository: it downloads the built
+  files and runs the pinned upload action. The `build` job, which runs the build backend and
+  snappnt itself, has read access to the repository contents only. The checkout keeps no git
+  credentials, and the `uv` cache is off, so nothing restored from a cache written by an
+  earlier run goes into a release. The PyPI publisher is bound to the workflow file
+  `publish.yml` and the environment `pypi`, so PyPI refuses a token requested by another
+  workflow or by a job outside that environment.
 - The start conditions are checked statically on every pull request and push to `main`; see
   "Checking the workflow files" below.
 - Transmit commands, pushes to `main`, and repository settings commands are denied through
