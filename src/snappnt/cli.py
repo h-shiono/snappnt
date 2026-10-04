@@ -104,7 +104,11 @@ def cmd_acquire(a: argparse.Namespace) -> int:
     from snappnt.rx import acquire
     from snappnt.signals import load_signal
 
-    x, meta = read_sigmf(a.file)
+    try:
+        x, meta = read_sigmf(a.file, start_s=a.start_s, duration_s=a.duration_s)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     fs = float(meta["global"]["core:sample_rate"])
     truth = get_truth(meta)
     signal = a.signal or (truth or {}).get("signal")
@@ -117,9 +121,19 @@ def cmd_acquire(a: argparse.Namespace) -> int:
         return 2
     center = (truth or {}).get("baseband_offset_hz", 0.0) if a.center is None else a.center
     prns = _parse_prns(a.prn) if a.prn else list(spec.prns())
-    truth_by_prn = {s["prn"]: s for s in (truth or {}).get("satellites", [])}
+    # The truth code phase refers to the first sample of the file, so it is compared only
+    # when the segment starts there.
+    start_sample = round(a.start_s * fs)
+    truth_by_prn = {}
+    if start_sample == 0:
+        truth_by_prn = {s["prn"]: s for s in (truth or {}).get("satellites", [])}
 
-    print(f"{spec.name}: {x.size} samples at {fs / 1e6:g} MSa/s ({x.size / fs * 1e3:.3f} ms)")
+    print(
+        f"{spec.name}: {x.size} samples at {fs / 1e6:g} MSa/s ({x.size / fs * 1e3:.3f} ms)"
+        + (f" from sample {start_sample} ({a.start_s:g} s)" if start_sample else "")
+    )
+    if start_sample and truth is not None:
+        print("truth refers to the first sample of the file; not compared for this segment")
     print(" PRN  det  code[chip]   freq[Hz]   metric  thr    C/N0est  truth")
     for prn in prns:
         r = acquire(
@@ -396,6 +410,17 @@ def build_parser() -> argparse.ArgumentParser:
             s.add_argument("--signal")
             s.add_argument("--prn")
             s.add_argument("--center", type=float, help="carrier offset in baseband [Hz]")
+            s.add_argument(
+                "--start-s",
+                type=float,
+                default=0.0,
+                help="start of the segment to acquire, from the first sample of the file [s]",
+            )
+            s.add_argument(
+                "--duration-s",
+                type=float,
+                help="length of the segment to acquire [s] (default: to the end of the file)",
+            )
         else:
             s.add_argument("scenario")
             s.add_argument("--cn0", default="40:60:2", help="start:stop:step or list [dB-Hz]")
