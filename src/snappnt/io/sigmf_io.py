@@ -193,14 +193,39 @@ def write_sigmf(
     return base
 
 
-def read_sigmf(path: str | Path) -> tuple[np.ndarray, dict[str, Any]]:
-    """Return (samples as complex64, metadata dict)."""
+def read_sigmf(
+    path: str | Path,
+    *,
+    start_s: float = 0.0,
+    duration_s: float | None = None,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Return (samples as complex64, metadata dict).
+
+    ``start_s`` and ``duration_s`` select a segment of the recording: it starts at sample
+    ``round(start_s * fs)`` and holds ``round(duration_s * fs)`` samples, where ``fs`` is
+    ``core:sample_rate``. ``duration_s=None`` reads to the end of the file. Only the samples
+    of the segment are read from the file. A segment that starts before the first sample,
+    holds no samples or reaches past the last sample raises ``ValueError``."""
     base = _base(path)
     meta = json.loads(_with(base, ".sigmf-meta").read_text(encoding="utf-8"))
     datatype = meta["global"]["core:datatype"]
     if datatype not in _DTYPES:
         raise ValueError(f"unsupported datatype {datatype}")
-    raw = np.fromfile(_with(base, ".sigmf-data"), dtype=_DTYPES[datatype])
+    dtype = _DTYPES[datatype]
+    data_path = _with(base, ".sigmf-data")
+    offset, count = 0, -1
+    if start_s != 0.0 or duration_s is not None:
+        fs = float(meta["global"]["core:sample_rate"])
+        total = data_path.stat().st_size // dtype.itemsize
+        offset = round(start_s * fs)
+        count = total - offset if duration_s is None else round(duration_s * fs)
+        if offset < 0 or count <= 0 or offset + count > total:
+            stop = f"{start_s + duration_s:g} s" if duration_s is not None else "the end"
+            raise ValueError(
+                f"segment from {start_s:g} s to {stop} (samples {offset} to {offset + count}) "
+                f"is not within the recording, which holds {total} samples ({total / fs:g} s)"
+            )
+    raw = np.fromfile(data_path, dtype=dtype, offset=offset * dtype.itemsize, count=count)
     if datatype == "cf32_le":
         x = raw.astype(np.complex64)
     else:
