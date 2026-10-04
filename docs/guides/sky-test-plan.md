@@ -167,9 +167,15 @@ uv run python tools/sky_link_budget.py --antenna-gain-dbic 3 --antenna-temp-k 10
   in any document this project has found. It is shown as 5, 10 and 15 dB. The conducted test
   (issue #11) did not measure it: the input level at the ESP32 was not known, because no power
   meter or calibrated noise source was available ([Conducted test (M3)](../results/conducted-m3.md),
-  "Not verified"). A known input level at the antenna pin, set with a power meter or a
-  calibrated noise source, together with the C/N0 measured from the captures, would give the
-  noise figure through the conducted-test calculator (`snappnt link-budget`).
+  "Not verified"). What would measure it: captures of the generator's signal **without noise
+  added in software** (in the M3 runs that noise dominates the receiver's own noise), at an
+  input level at the antenna pin that is known from a power meter or a calibrated noise
+  source. With P_in the signal power at the antenna pin in dBm and C/N0 the value estimated
+  from those captures (`cn0_dbhz_est` of `acquire`, whose bias is measured in
+  [C/N0 estimate bias](../results/cn0-bias.md)), NF = P_in − C/N0 + 174.0 dB, where
+  −174.0 dBm/Hz is kT at 290 K. This is the relation of `cn0_dbhz` in
+  `src/snappnt/eval/linkbudget.py` solved for NF; `snappnt link-budget` takes NF as an input
+  and does not do this inversion.
 - **Implementation losses** after the receiver input (quantisation, filtering, short
   snapshots) are not part of this calculation; they are included in the simulated detection
   curves that the result is compared with.
