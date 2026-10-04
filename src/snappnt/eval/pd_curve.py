@@ -17,6 +17,11 @@ from snappnt.rx import acquire
 from snappnt.signals import load_signal
 from snappnt.sim import SatelliteTruth, Scenario, generate
 
+CODE_DOPPLER_LO_ERROR = (
+    "code Doppler compensation supports direct reception only: with an external LO (lo_hz) "
+    "the IF offset includes the LO error, which does not change the code rate"
+)
+
 
 @dataclass(frozen=True)
 class SweepPoint:
@@ -45,11 +50,18 @@ def sweep(
     code_tol_chips: float = 0.5,
     seed: int = 0,
     remove_dc: str = "none",
+    code_doppler: bool = False,
 ) -> list[SweepPoint]:
-    """Vary C/N0 of the scenario's first satellite; code phase and Doppler are randomised."""
+    """Vary C/N0 of the scenario's first satellite; code phase and Doppler are randomised.
+
+    ``code_doppler`` is passed to ``acquire``. It assumes direct reception, so a scenario whose
+    frequency plan has an external LO (``lo_hz``) raises ``ValueError``.
+    """
     spec = load_signal(base.signal)
     if not base.satellites:
         raise ValueError("scenario needs at least one satellite")
+    if code_doppler and base.frequency_plan is not None and base.frequency_plan.lo_hz is not None:
+        raise ValueError(CODE_DOPPLER_LO_ERROR)
     sat0 = base.satellites[0]
     rng = np.random.default_rng(seed)
     out = []
@@ -76,6 +88,7 @@ def sweep(
                 n_blocks=n_blocks,
                 pfa=pfa,
                 remove_dc=remove_dc,
+                code_doppler=code_doppler,
             )
             metrics.append(res.metric)
             if res.detected:

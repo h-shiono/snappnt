@@ -375,3 +375,34 @@ an earlier one and says so.
 - **Verified:** in the conducted test of 2026-10-04 all nine brackets had their median in the
   same bin, so the one-bin tolerance was used for every run
   ([Conducted test](../results/conducted-m3.md)).
+
+## D-023 Code Doppler in acquisition: groups of frequency bins with scaled replicas, direct reception only (2026-10-04)
+
+- **Decision:** `snappnt.rx.acquire` takes `code_doppler` (default `False`; command-line
+  `--code-doppler` on `snappnt acquire` and `snappnt sweep`). When it is true, the frequency
+  bins are split into groups of neighbouring bins at most
+  2 × 0.1 × f_c / (R_c × T) wide, where f_c is the carrier frequency, R_c the nominal chip
+  rate and T the snapshot length. Each group is correlated with a replica of chip rate
+  R_c × (1 + f_g / f_c), where f_g is the middle of the group measured from the centre of the
+  search. The groups are processed one at a time, so only one group's replica spectra are in
+  memory. The option is for direct reception only: `sweep()` and both commands stop with an
+  error when the frequency plan has an external LO (`lo_hz`). Issue #72.
+- **Why:** in direct reception one crystal drives the LO and the ADC, so a carrier offset Δf
+  (satellite Doppler and receiver clock error together) comes with a code-rate change of
+  Δf / f_c relative to the sample clock. At Δf = 25 kHz the code drifts about 2 chips over
+  0.2 s, which spreads the correlation peak over several lags when one replica at R_c is used
+  for every bin. The group width keeps the code drift left within a group below 0.1 chip.
+  With an external mixer the offset at the receiver also contains the external LO error,
+  which shifts the IF without changing the code rate, so the same scaling would be wrong.
+- **Alternatives:** A replica for every frequency bin (exact, but one replica FFT per bin and
+  per block). One replica scaled by the middle of the search range (a ±50 kHz search over
+  0.2 s still leaves up to about 4 chips of drift at the edges). Keeping one replica and
+  shifting each block's correlation by f / f_c × R_c × t_b for the block start time t_b,
+  with interpolation for the fractional sample, before the blocks are added (exact per bin,
+  with no extra FFTs or memory; within a 4 ms block the drift is about 0.04 chip at 25 kHz).
+  This last option may be taken up in a later issue.
+- **Verified:** with the option off, the result equals the frozen pre-change implementation
+  (`tests/test_code_doppler.py::test_off_matches_reference`). A simulated 0.2 s snapshot at
+  4 MSa/s with a −10 ppm clock error (+24.92 kHz), 36 dB-Hz and 50 blocks of 4 ms gives a
+  code-phase error of 0.109 chip with the option and 1.129 chip without, and a metric of 13.5
+  against 6.1 (`test_long_snapshot_with_clock_error`).
