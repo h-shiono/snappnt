@@ -33,6 +33,12 @@ CI runs `python tools/check_public_safety.py`, which scans tracked text files fo
 patterns: email addresses outside an allow list, personal absolute paths, coordinate-like keys
 with precise values, and a `core:geolocation` key. <!-- public-safety: ignore -->
 
+It also reads the metadata of tracked JPEG, PNG, WebP and TIFF images (EXIF, XMP and PNG text
+chunks) and reports GPS data, the date and time a photo was taken, and the camera make and
+model. A metadata block it cannot parse is reported too. HEIC, HEIF and AVIF images are not
+parsed and are always reported; convert them to JPEG or PNG first. The parser uses the Python
+standard library only.
+
 A list of specific private words (a family name, a street, a company) would itself publish
 those words, so it is never committed. To check for such words locally, keep a list in a file
 outside the repository, one term per line, and point the check at it:
@@ -42,6 +48,36 @@ SNAPPNT_PRIVATE_TERMS=~/.config/snappnt/private-terms.txt python tools/check_pub
 ```
 
 This can be added as a local git pre-commit hook.
+
+## Photos
+
+A photo taken with a phone or camera usually carries EXIF metadata: often the GPS position
+where it was taken, and the date, time and camera model. Strip it before committing the photo.
+Either of these works:
+
+- With [ExifTool](https://exiftool.org/), which removes all metadata in place:
+
+  ```bash
+  exiftool -all= photo.jpg
+  ```
+
+- With Python and Pillow only. Copying the pixels into a new image leaves every metadata block
+  behind; `exif_transpose` first applies the EXIF orientation, so the photo stays upright once
+  the orientation tag is gone:
+
+  ```python
+  from PIL import Image, ImageOps
+
+  with Image.open("photo.jpg") as im:
+      im = ImageOps.exif_transpose(im)
+      clean = Image.new(im.mode, im.size)
+      clean.paste(im)
+      clean.save("photo-clean.jpg", quality=90)
+  ```
+
+Then stage the stripped copy (`git add`) and run `python tools/check_public_safety.py` to
+confirm that it has no findings. The check reads only files that git tracks, so an image that
+has not been added yet is not checked.
 
 ## What agents do
 
