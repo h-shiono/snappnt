@@ -14,5 +14,6 @@ Recorded pages:
 | [LEO Doppler rate and the Doppler-rate search](leo-doppler-rate.md) | #16 |
 | [ESP32-C3 bench checks without an RF source](esp32c3-bench-no-rf.md) | #41 |
 | [Removing the DC offset before acquisition](dc-removal.md) | #43 |
+| [Conducted test of NavIC S-band SPS on the XIAO ESP32C3](conducted-m3.md) | #11 |
 
 When adding a page, also add it to the `nav` section of `mkdocs.yml`.
