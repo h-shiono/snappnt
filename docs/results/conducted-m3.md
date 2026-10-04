@@ -31,6 +31,11 @@ B210 clone, TRX1 port ─ 30 dB ─ 20 dB ─ 10 dB ─ DC block ─ SMA to U.FL
 TRX2, RX1, RX2 of the B210 clone: 50 Ω loads (as stated by the maintainer for the runs)
 ```
 
+![The bench: B210 clone (left) with 50 Ω loads on TRX2, RX1 and RX2 and a cable from TRX1 to the attenuator board (right), whose 30, 20 and 10 dB sections are joined in series by two cable loops; a DC block and a cable to the U.FL connector of the XIAO ESP32C3 (bottom).](conducted-m3-bench.jpg)
+
+The photograph shows the second session's arrangement. In the first session the generator
+end was the same and the receiver end was the same XIAO with the same cable.
+
 | Item | Value |
 |---|---|
 | Generator | B210 clone (AD9361) in its case, port TRX1 (UHD TX channel 0, `FE-TX2`), UHD 4.10, `tx_samples_from_file` with `--args "num_send_frames=512"` |
