@@ -14,8 +14,10 @@ costs.
 
 The agents post, label and push through the repository owner's token (see "Why a personal
 access token" below), so their comments and labels are authored by the owner's account. Every
-start condition on a comment or label therefore requires the owner as author, tagged or not;
-see "Start conditions in a public repository" under "Security notes".
+start condition on a comment or label therefore requires the owner as author, tagged or not.
+The one exception is the orchestrator's start on Greptile's review summary comment, which
+requires `greptile-apps[bot]` as author. See "Start conditions in a public repository" under
+"Security notes".
 
 Both run `anthropics/claude-code-action` in automation mode (a `prompt` is given, so it does
 not wait for an `@claude` mention), pinned to a release commit. Each run starts from a fresh
