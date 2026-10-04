@@ -295,41 +295,46 @@ One in place of the XIAO, with the same attenuators and DC block and the same tr
 
 ### C/N0 delivered by the generator
 
-`tools/conducted_pd.py cn0` estimates C/N0 from the first 1000 code periods (1 s) of a
+`tools/conducted_pd.py cn0` estimates C/N0 from segments of 100 code periods (0.1 s) of a
 recording:
 
 1. carrier frequency on a 10 Hz grid, chosen by the largest mean correlation peak;
-2. code phase of each 1 ms block from its correlation peak, a straight line fitted through
-   these against time, the recording cut again so that each block starts at a code epoch (a
+2. code phase of each 1 ms block from its correlation peak; a straight line is fitted through
+   these (after a running median over five blocks, which removes blocks with a data-symbol
+   sign change), and the segment is cut again so that each block starts at a code epoch (a
    data symbol then never changes sign inside a block);
-3. prompt correlation of each block at the fitted code phase, SNR from the second and fourth
-   moments of the prompt values (M2M4 estimator), C/N0 = SNR / 1 ms.
+3. prompt correlation of each block with a replica delayed by the fitted, unrounded code
+   phase, so that the prompt amplitude does not change as the code phase drifts across the
+   sample grid;
+4. SNR from the second and fourth moments of the prompt values (M2M4 estimator),
+   C/N0 = SNR / 1 ms.
 
-The same estimator was run on the playback file itself (resampled from 8 to 20 MSa/s, as the
-generator interpolates it) and on the HackRF recordings, so that losses inside the estimator
-cancel in the difference.
+Segments of 0.1 s are used because over 1 s the code phase of the HackRF recordings departs
+from a straight line by up to 1.8 samples (0.09 chip), which lowers a 1 s estimate by up to
+about 1 dB at 60 dB-Hz. The same estimator was run on the playback file itself (resampled
+from 8 to 20 MSa/s, as the generator interpolates it), on simulated signals, and on the
+HackRF recordings, so that losses inside the estimator cancel in the difference. Values are
+the mean over the segments and the standard error of that mean.
 
-| Recording | C/N0 estimate [dB-Hz] |
-|---|---|
-| Ideal simulation at 20 MSa/s, 60 dB-Hz, no clock error | 59.99 |
-| Same, with a clock error that gives a code drift of +0.56 chip/s | 59.71 |
-| Playback file, 60 dB-Hz | 59.80 |
-| HackRF recording, 60 dB-Hz | 58.28 |
-| Playback file, 50 dB-Hz | 49.86 |
-| HackRF recording, 50 dB-Hz | 49.39 |
+| Recording | Segments | C/N0 estimate [dB-Hz] |
+|---|---|---|
+| Ideal simulation at 20 MSa/s, 60 dB-Hz, no clock error | 9 | 60.05 ± 0.27 |
+| Same, with a clock error that gives a code drift of +0.56 chip/s | 9 | 60.31 ± 0.21 |
+| Playback file, 60 dB-Hz | 9 | 59.79 ± 0.15 |
+| HackRF recording, 60 dB-Hz | 90 | 59.33 ± 0.06 |
+| Playback file, 50 dB-Hz | 9 | 49.86 ± 0.15 |
+| HackRF recording, 50 dB-Hz | 88 (2 of 90 skipped: no code phase found) | 49.48 ± 0.06 |
 
-- The playback file itself is 0.2 dB below an ideal signal at 60 dB-Hz (band limiting to the
-  8 MSa/s generation rate) and 0.14 dB below the scenario value at 50 dB-Hz.
-- A code drift like the HackRF's lowers the estimate by about 0.3 dB at 60 dB-Hz: the
-  correlation peak moves against the sample grid and the prompt amplitude varies from block
-  to block, which M2M4 counts as noise. At 50 dB-Hz the SNR per block is ten times lower and
-  this effect is about ten times smaller.
-- From playback file to HackRF recording, the estimate falls by **0.47 dB at 50 dB-Hz** and
-  by 1.5 dB at 60 dB-Hz (about 1.2 dB after allowing for the drift effect). A loss that grows
-  with C/N0 is what a limit on the attainable C/N0 inside the chain would give, for example
-  phase noise of the generator or of the HackRF; a limit near 64 to 65 dB-Hz (1 ms
-  integration) would explain both values. This is a hypothesis; the recordings cannot tell
+- The estimator is not biased by a code drift like the HackRF's (the two simulated rows agree
+  within their errors).
+- From playback file to HackRF recording the estimate falls by **0.46 ± 0.16 dB at 60 dB-Hz
+  and 0.38 ± 0.16 dB at 50 dB-Hz**. The two are the same within their errors: about 0.4 dB is
+  lost in the generator chain, independent of C/N0 in this range. The recordings cannot tell
   whether the loss is in the B210 clone or in the HackRF.
+- The playback file itself is 0.14 to 0.2 dB below the scenario value (60.05 for an ideal
+  20 MSa/s signal against 59.79; 49.86 against 50). These differences are about the size of
+  their errors; they are attributed to the band limiting of a signal generated at 8 MSa/s, as
+  an estimate.
 
 ## Where the 0.7 dB comes from
 
@@ -338,9 +343,9 @@ Estimated contributions near 50 to 52 dB-Hz, where the 50 % and 90 % points are:
 | Contribution | Estimate [dB] | How it was obtained |
 |---|---|---|
 | Playback file generated at 8 MSa/s | 0.14 to 0.2 | M2M4 estimate of the playback file against the scenario value and against an ideal 20 MSa/s signal |
-| Generator chain (B210 clone and HackRF together) | about 0.45 | M2M4 estimate, HackRF recording against playback file, 50 dB-Hz; includes any loss in the HackRF, so it is an upper bound for the generator alone |
+| Generator chain (B210 clone and HackRF together) | about 0.4 (± 0.16) | M2M4 estimate, HackRF recording against playback file, at 50 and 60 dB-Hz; includes any loss in the HackRF, so it is an upper bound for the generator alone |
 | Carrier between grid points | about 0.16 | The measured carrier is 0.33 bin from the nearest grid point (sinc² loss 0.38 dB); in the simulation it is 0.25 bin away (12 ppm at 2492.028 MHz is −29.9 kHz on a 2441.4 Hz grid; loss 0.22 dB) |
-| **Sum** | **about 0.75 to 0.8** | |
+| **Sum** | **about 0.7 to 0.8** | |
 
 The sum is close to the measured shift of 0.7 dB, which leaves little for the XIAO's own
 receiver chain (gain, 14 MHz analog filter, DC removal, its oscillators) beyond what the
@@ -354,8 +359,8 @@ part, so this split is not exact.
   made after the ESP32 runs, not at the same time.
 - The generator's output power and the noise figures of the XIAO and of the HackRF (no power
   meter, no calibrated noise source).
-- Whether the chain loss of about 0.45 dB at 50 dB-Hz lies in the B210 clone or in the
-  HackRF; the same playback recorded by a second, different receiver would separate them.
+- Whether the chain loss of about 0.4 dB lies in the B210 clone or in the HackRF; the same
+  playback recorded by a second, different receiver would separate them.
 - The leak path with the XIAO's cable attached (the check measured it with the cable off).
 - The measured curve is from one XIAO board on one day.
 
@@ -369,15 +374,27 @@ code phase and C/N0 estimate. The per-run results are
 [conducted_m3_pd.csv](conducted_m3_pd.csv) and
 [conducted_m3_pd_dc_none.csv](conducted_m3_pd_dc_none.csv).
 
+The directory layout used below: `out/m3/off/` holds the 20 generator-off captures taken
+while setting the level (the reference of every `rise` value on this page); `out/m3/run/<run>/`
+holds one directory per row of the table in the section "Runs" (b0 to b8, cn50 to cn60,
+noise, off), in that order.
+
 ```bash
-# playback files
-uv run snappnt sim scenarios/navic_s_conducted_gen_cn0_50.yaml --uhd -o out/m3/play/navic_s_conducted_gen_cn0_50
-# transmit (run by a person, after checking the path is closed)
-tx_samples_from_file --args "num_send_frames=512" --file <playback>.uhd.sc16 --type short \
-    --freq 2490528000.0 --rate 8000000.0 --gain 60 --repeat
-# capture, one directory per run
+# playback files, one per scenario of the section "Playback files"
+for s in navic_s_conducted_gen navic_s_conducted_gen_cn0_{50,51,52,53,55} navic_s_conducted_gen_noise; do
+    uv run snappnt sim scenarios/$s.yaml --uhd -o out/m3/play/$s
+done
+# generator-off reference for the level (generator connected, not streaming)
 uv run snappnt capture <port> --freq-hz 2492e6 --rate-sps 80e6 -n 16380 --gain 60 \
-    --bandwidth-mhz 14 --count 200 -o out/m3/run/cn50/cn50
+    --bandwidth-mhz 14 --count 20 -o out/m3/off/off
+# for each run of the section "Runs", in order: a person starts the generator with the
+# run's playback file (60 dB-Hz for b0 to b8, nothing for "off") ...
+tx_samples_from_file --args "num_send_frames=512" --file out/m3/play/<playback>.uhd.sc16 \
+    --type short --freq 2490528000.0 --rate 8000000.0 --gain 60 --repeat
+# ... waits for "Press Ctrl + C to stop streaming", and the run is captured
+# (--count 20 for a bracket, 200 otherwise), then the generator is stopped
+uv run snappnt capture <port> --freq-hz 2492e6 --rate-sps 80e6 -n 16380 --gain 60 \
+    --bandwidth-mhz 14 --count <20 or 200> -o out/m3/run/<run>/<run>
 # level, leak and reference checks
 uv run python tools/conducted_pd.py rise out/m3/off out/m3/run/cn60
 uv run python tools/conducted_pd.py rise out/m3/hackrf/off out/m3/hackrf/on60 \
@@ -397,6 +414,7 @@ uv run python tools/conducted_pd.py acquire out/m3/run/b0 out/m3/run/cn60 out/m3
     --center-hz 46608 --freq-span-hz 3000 --freq-step-hz 100 --remove-dc mean -o out/m3/fine.csv
 # delivered C/N0
 uv run python tools/conducted_pd.py cn0 out/m3/play/navic_s_conducted_gen_cn0_50 \
-    --carrier-hz 1500000 --resample-sps 20e6
-uv run python tools/conducted_pd.py cn0 out/m3/hackrf/on50 --carrier-hz 2029750
+    --carrier-hz 1500000 --resample-sps 20e6 --blocks 100 --segments 10
+uv run python tools/conducted_pd.py cn0 out/m3/hackrf/on50 --carrier-hz 2029750 \
+    --blocks 100 --segments 90
 ```

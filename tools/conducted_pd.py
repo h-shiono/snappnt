@@ -30,10 +30,12 @@ XIAO ESP32C3 records 0.2 ms captures with ``snappnt capture``. Subcommands:
 
 ``cn0``   C/N0 estimate of one long recording (for example the reference recorded by a
           HackRF One, or the playback file itself), from the prompt correlations of 1 ms
-          blocks by the M2M4 moments estimator. Run it on the playback file and on the
-          recording alike and compare: losses inside the estimator cancel in the difference.
+          blocks by the M2M4 moments estimator, averaged over segments. Run it on the
+          playback file and on the recording alike and compare: losses inside the estimator
+          cancel in the difference.
 
-          uv run python tools/conducted_pd.py cn0 out/m3/hackrf/on50 --carrier-hz 2029750
+          uv run python tools/conducted_pd.py cn0 out/m3/hackrf/on50 --carrier-hz 2029750 \\
+              --blocks 100 --segments 90
 
 ``plot``  Measured detection probability over the simulated curve of ``snappnt sweep``
           (needs the ``plot`` extra).
@@ -190,7 +192,10 @@ def load_set(
         segs, fs = [], 0.0
         for p in paths:
             x, meta = read_sigmf(p)
-            fs = float(meta["global"]["core:sample_rate"])
+            capture_fs = float(meta["global"]["core:sample_rate"])
+            if segs and capture_fs != fs:
+                raise SystemExit(f"captures in {path} have different sample rates")
+            fs = capture_fs
             segs.append(x)
     else:
         segs, fs = read_segments(path, 100 * FFT_SIZE, 200)
@@ -486,6 +491,26 @@ def block_correlations(
     return out
 
 
+def prompt_values(
+    blocks: np.ndarray, fs: float, spec, prn: int, carrier_hz: float, lags: np.ndarray
+) -> np.ndarray:
+    """Prompt correlation of each block with a replica delayed by ``lags`` samples (not
+    rounded). The replica's chips are sampled at ``fs`` with the same fractional delay as the
+    received code, so the prompt amplitude does not change as the code phase moves across the
+    sample grid."""
+    from snappnt.signals import get_code
+
+    code = get_code(spec, prn).astype(np.float32)
+    n = blocks.shape[1]
+    t = np.arange(n)
+    wipe = np.exp(-2j * np.pi * carrier_hz * t / fs).astype(np.complex64)
+    out = np.empty(blocks.shape[0], dtype=np.complex64)
+    for k, b in enumerate(blocks):
+        idx = np.floor((t - lags[k]) * spec.chip_rate_hz / fs).astype(np.int64) % code.size
+        out[k] = np.sum(b * wipe * code[idx])
+    return out
+
+
 def m2m4_snr(prompt: np.ndarray) -> float:
     """Signal-to-noise ratio of complex values y = A e^(j phi) + n with constant A and
     circular Gaussian noise, from the second and fourth moments (M2M4 estimator):
@@ -516,7 +541,8 @@ def estimate_cn0(
     2. The code phase (lag in samples) of each block is the peak of its correlation; a
        straight line is fitted to these lags against the block number, so that the drift of
        the code phase between the clocks of transmitter and receiver is followed without
-       picking noise peaks, and the prompt value of each block is read at the rounded line.
+       picking noise peaks. The prompt value of each block is the correlation with a replica
+       delayed by the fitted, unrounded lag (``prompt_values``).
     3. The recording is cut again so that each block starts at a code epoch. Data symbols
        change sign only at code epochs, so a block then holds one symbol and the prompt
        value has a constant amplitude, as M2M4 assumes (up to the slow code drift).
@@ -524,11 +550,15 @@ def estimate_cn0(
 
     Correlation losses (code phase between samples, a data-symbol edge inside a block, band
     limiting) lower the estimate in the same way for recordings processed alike."""
+    from scipy.ndimage import median_filter
+
     from snappnt.rx.acquisition import remove_dc_offset
 
     rep = code_replica(spec, prn, fs)
     n = rep.size
     nb = min(n_blocks, x.size // n)
+    if nb < 2:
+        raise ValueError(f"need at least two whole code periods, got {nb}")
     blocks = remove_dc_offset(x[: nb * n], remove_dc).reshape(nb, n)
     freqs = np.arange(carrier_hz - span_hz, carrier_hz + span_hz + step_hz / 2, step_hz)
     probe = blocks[: min(nb, 50)]
@@ -541,6 +571,9 @@ def estimate_cn0(
     k = np.arange(nb, dtype=float)
     # Unwrap lags across the code period before fitting.
     lags = np.unwrap(lags * 2 * np.pi / n) * n / (2 * np.pi)
+    # A block holding a data-symbol sign change has a weak, misplaced peak; a running median
+    # over five blocks keeps such single outliers out of the fit.
+    lags = median_filter(lags, 5, mode="nearest")
     slope, intercept = np.polyfit(k, lags, 1)
     fit = np.round(intercept + slope * k).astype(np.int64) % n
     if not _aligned and fit[0] != 0:
@@ -548,8 +581,10 @@ def estimate_cn0(
             x[int(fit[0]) :], fs, spec, prn, carrier_hz=f_best, n_blocks=n_blocks,
             span_hz=step_hz, step_hz=step_hz, remove_dc=remove_dc, _aligned=True,
         )  # fmt: skip
-    prompt = corr[np.arange(nb), fit]
+    prompt = prompt_values(blocks, fs, spec, prn, f_best, intercept + slope * k)
     snr = m2m4_snr(prompt)
+    if not snr > 0:
+        raise ValueError("no signal power in the prompt values (code phase not found)")
     t_s = n / fs
     return {
         "cn0_dbhz": 10 * math.log10(snr / t_s),
@@ -570,22 +605,38 @@ def cmd_cn0(a: argparse.Namespace) -> int:
     path = Path(a.recording)
     meta = json.loads(_meta_path(path).read_text())
     fs = float(meta["global"]["core:sample_rate"])
-    n_in = int(math.ceil(spec.code_period_s * fs * a.blocks))
-    segs, fs = read_segments(path, n_in, 1)
-    x = segs[0]
-    if a.resample_sps and a.resample_sps != fs:
-        frac = Fraction(a.resample_sps / fs).limit_denominator(1000)
-        x = resample_poly(x, frac.numerator, frac.denominator).astype(np.complex64)
-        fs = fs * frac.numerator / frac.denominator
-    r = estimate_cn0(
-        x, fs, spec, a.prn, carrier_hz=a.carrier_hz, n_blocks=a.blocks,
-        span_hz=a.span_hz, step_hz=a.step_hz, remove_dc=a.remove_dc,
-    )  # fmt: skip
-    print(
-        f"{path.name}: {r['blocks']} blocks of {spec.code_period_s * 1e3:g} ms at "
-        f"{fs / 1e6:g} MSa/s, carrier {r['carrier_hz']:.0f} Hz, code drift "
-        f"{r['code_drift_chips_per_s']:+.3f} chip/s, C/N0 estimate {r['cn0_dbhz']:.2f} dB-Hz"
-    )
+    # One code period more than asked for: aligning the blocks to a code epoch drops the
+    # samples before the first epoch.
+    n_in = int(math.ceil(spec.code_period_s * fs * (a.blocks + 1)))
+    segs, fs_in = read_segments(path, n_in, a.segments)
+    values = []
+    for x in segs:
+        fs = fs_in
+        if a.resample_sps and a.resample_sps != fs:
+            frac = Fraction(a.resample_sps / fs).limit_denominator(1000)
+            x = resample_poly(x, frac.numerator, frac.denominator).astype(np.complex64)
+            fs = fs * frac.numerator / frac.denominator
+        try:
+            r = estimate_cn0(
+                x, fs, spec, a.prn, carrier_hz=a.carrier_hz, n_blocks=a.blocks,
+                span_hz=a.span_hz, step_hz=a.step_hz, remove_dc=a.remove_dc,
+            )  # fmt: skip
+        except ValueError as e:
+            print(f"{path.name}: segment skipped: {e}")
+            continue
+        values.append(r["cn0_dbhz"])
+        print(
+            f"{path.name}: {r['blocks']} blocks of {spec.code_period_s * 1e3:g} ms at "
+            f"{fs / 1e6:g} MSa/s, carrier {r['carrier_hz']:.0f} Hz, code drift "
+            f"{r['code_drift_chips_per_s']:+.3f} chip/s, C/N0 estimate {r['cn0_dbhz']:.2f} dB-Hz"
+        )
+    if len(values) > 1:
+        v = np.array(values)
+        sd = v.std(ddof=1)
+        print(
+            f"{path.name}: {v.size} segments, mean {v.mean():.2f} dB-Hz, standard deviation "
+            f"{sd:.2f} dB, standard error of the mean {sd / np.sqrt(v.size):.2f} dB"
+        )
     return 0
 
 
@@ -737,6 +788,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     c.add_argument("--signal", default="navic_s_sps")
     c.add_argument("--prn", type=int, default=10)
     c.add_argument("--blocks", type=int, default=1000, help="code periods from the start")
+    c.add_argument(
+        "--segments", type=int, default=1, help="segments spread over the recording, each estimated"
+    )
     c.add_argument("--span-hz", type=float, default=100.0)
     c.add_argument("--step-hz", type=float, default=10.0)
     c.add_argument("--remove-dc", choices=("none", "mean", "linear"), default="mean")

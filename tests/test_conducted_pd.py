@@ -192,6 +192,53 @@ def test_estimate_cn0_tracks_scenario_difference(tmp_path):
     assert 58.5 < est[0] < 60.3
 
 
+def test_estimate_cn0_with_code_drift_and_off_grid_carrier(tmp_path):
+    """Clock error of 5 ppm: the carrier is off the 10 Hz search grid and the code phase
+    drifts by about 5 chips/s, so the blocks must be re-aligned and the code phase fitted.
+    The 10 dB scenario difference must still read as 10 dB."""
+    from snappnt.sim.generate import expected_frequency_offset_hz
+
+    fs = 4e6
+    spec = _spec_navic()
+    est = []
+    for cn0 in (60, 50):
+        text = (
+            "name: d\nsignal: navic_s_sps\nseed: 9\nreceiver:\n"
+            f"  sample_rate_hz: {fs}\n  n_samples: 400000\n"
+            "  baseband_offset_hz: 0\n  clock_offset_ppm: 5.0\n"
+            "satellites:\n"
+            f"  - {{prn: 10, cn0_dbhz: {cn0}, doppler_hz: 0, code_phase_chips: 700.3}}\n"
+        )
+        p = tmp_path / f"d{cn0}.yaml"
+        p.write_text(text)
+        scn = load_scenario(p)
+        x, _ = generate(scn)
+        f_true = expected_frequency_offset_hz(scn, 0.0, spec.carrier_hz)
+        r = cpd.estimate_cn0(x, fs, spec, 10, carrier_hz=round(f_true, -2), n_blocks=95)
+        assert abs(r["carrier_hz"] - f_true) <= 5.0 + 1e-6
+        # Code rate scales with the clock error: 5e-6 of 1.023 Mchip/s, sign as the sample clock.
+        assert abs(abs(r["code_drift_chips_per_s"]) - 5e-6 * spec.chip_rate_hz) < 1.0
+        assert r["blocks"] == 95
+        est.append(r["cn0_dbhz"])
+    assert est[0] - est[1] == pytest.approx(10.0, abs=0.3)
+
+
+def test_estimate_cn0_needs_two_blocks():
+    x = np.zeros(6000, dtype=np.complex64)  # 1.5 code periods at 4 MSa/s
+    with pytest.raises(ValueError):
+        cpd.estimate_cn0(x, 4e6, _spec_navic(), 10, carrier_hz=0.0, n_blocks=10)
+
+
+def test_load_set_rejects_mixed_sample_rates(tmp_path):
+    d = tmp_path / "mixed"
+    d.mkdir()
+    x = np.ones(4096, dtype=np.complex64)
+    write_sigmf(d / "a", x, 80e6, center_frequency_hz=2492e6)
+    write_sigmf(d / "b", x, 40e6, center_frequency_hz=2492e6)
+    with pytest.raises(SystemExit):
+        cpd.load_set(d)
+
+
 def _spec_navic():
     from snappnt.signals import load_signal
 
