@@ -2,20 +2,62 @@
 
 Snapshot PNT receiver toolkit for low-cost front ends.
 
-snappnt pairs a signal simulator with a snapshot acquisition engine so that captures from
-cheap radios — ESP32 chips via [ESPARGOS ESP-SDR](https://espargos.net/espsdr/), HackRF,
-USRP — can be processed and checked against known truth.
+snappnt pairs a signal simulator with a snapshot acquisition engine, so that short captures
+from cheap radios — ESP32 chips running [ESPARGOS ESP-SDR](https://espargos.net/espsdr/),
+HackRF, USRP — can be processed and checked against known truth. The first target is the
+NavIC S-band Standard Positioning Service signal at 2492.028 MHz, which an ESP32's own 2.4 GHz
+radio can receive without a mixer.
 
-> **Status:** pre-alpha, private. Not affiliated with ESPARGOS or Espressif.
+> **Status:** research software, early stage. The receive chain has been verified in a
+> conducted test (cables and attenuators, nothing radiated). **No satellite signal has been
+> received from the sky yet.** Not affiliated with ESPARGOS or Espressif.
+
+## What has been shown so far
+
+**Simulation (milestone M2).** Detection probability versus C/N0 for a XIAO ESP32C3-like
+receiver (80 MSa/s, a snapshot of about 0.2 ms, 10-bit ADC, 12 ppm crystal): 50 % detection
+at 50.2 dB-Hz and 90 % at 52.0 dB-Hz. With the longer captures that the ESP32-C61 allows
+(4 MSa/s, about 4 ms), the 50 % point moves to 37.8 dB-Hz with one 4 ms coherent block, or
+38.7 dB-Hz with four 1 ms blocks added non-coherently, assuming the chip band-limits at low
+sample rates (not yet confirmed). See
+[Detection probability versus C/N0](docs/results/pd-curves.md).
+
+**Conducted test (milestone M3).** A B210-class generator played NavIC S-band signals with
+noise added in software, through 60 dB of attenuation, into a Seeed XIAO ESP32C3 running the
+ESP-SDR firmware; 200 captures were taken at each C/N0. With the DC offset removed before
+acquisition, the measured curve has the simulated slope and lies 0.7 dB to the right of it
+(50 % at 50.9 dB-Hz, 90 % at 52.7 dB-Hz), and the results page accounts for most of that
+difference. See
+[Conducted test](docs/results/conducted-m3.md).
+
+![Detection probability of the XIAO ESP32C3 in the conducted test, with and without DC offset removal, over the simulated curve](docs/results/conducted-m3.png)
+
+**What this means for the sky.** At the minimum received power stated in the NavIC ICD
+(−162.3 dBW), a single 0.2 ms capture of the ESP32-C3 is not expected to detect the signal,
+even with a low-noise amplifier; a longer coherent snapshot is what the ESP32-C3 lacks. The
+ESP32-C61 with a 4 ms snapshot has a few dB of margin with a low-noise amplifier, but only if
+it band-limits at low sample rates. A HackRF or USRP with the same antenna and amplifier can
+record many milliseconds without gaps and is the most likely receiver for a first detection.
+These are estimates; they and the planned sky test are in
+[Sky test plan](docs/guides/sky-test-plan.md).
 
 ## Targets
 
 | Signal | Carrier | Front end | Status |
 |---|---|---|---|
-| NavIC S-band SPS | 2492.028 MHz | ESP32 (2.4 GHz, no mixer) | simulator + acquisition |
+| NavIC S-band SPS | 2492.028 MHz | ESP32 (2.4 GHz, no mixer) | simulator, acquisition, conducted test |
 | NavIC L5 SPS | 1176.45 MHz | reference only | codes |
 | GPS L1 C/A | 1575.42 MHz | reference only | codes (validation) |
 | C-band LEO-PNT (hypothetical BPSK) | 5010–5030 MHz | ESP32 + external mixer | placeholder |
+
+The C-band entry is a generic placeholder. LEO PNT in the 5010–5030 MHz RNSS allocation has
+been announced publicly: TrustPoint describes the constellation of navigation microsatellites
+that it is deploying in that allocation in
+[The Case for LEO GNSS at C-Band](https://insidegnss.com/the-case-for-leo-gnss-at-c-band/)
+(Inside GNSS, February 2025, written by TrustPoint staff). No
+C-band signal specification is public, so snappnt uses a made-up BPSK signal with random codes
+only to exercise the frequency plan (external mixer) and LEO Doppler; it does not model any
+real system.
 
 ## Quick start
 
@@ -29,8 +71,11 @@ uv run snappnt sweep scenarios/navic_s_esp32c3.yaml --cn0 48:60:2 --trials 20 -o
 uv run pytest -q
 ```
 
-The ESP32-C3 scenario models a XIAO ESP32C3: 80 MSa/s, a ~0.2 ms snapshot (a fifth of a
-NavIC code period), a 10-bit ADC and a 12 ppm crystal error.
+The ESP32-C3 scenario models a XIAO ESP32C3: 80 MSa/s, a snapshot of about 0.2 ms (a fifth
+of a NavIC code period), a 10-bit ADC and a 12 ppm crystal error.
+
+Hardware use (capturing from an ESP32 board, the conducted test) is described in
+[Conducted test](docs/guides/conducted-test.md).
 
 ## Layout
 
@@ -38,12 +83,14 @@ NavIC code period), a 10-bit ADC and a 12 ppm crystal error.
 src/snappnt/
   signals/   catalog/*.yaml (signal parameters) + codes/ (spreading-code generators)
   frontend/  devices/*.yaml (hardware limits) + freqplan.py (mixer frequency plans)
-  io/        SigMF read/write, ESP-SDR word decoding, generator command builders
+  io/        SigMF read/write, ESP-SDR client and word decoding, generator command builders
   sim/       scenarios, impairments, playback files for HackRF / UHD
   rx/        snapshot acquisition (works for snapshots shorter than one code period)
-  eval/      detection probability vs C/N0, truth comparison
+  eval/      detection probability vs C/N0, link budget, truth comparison
 scenarios/   example scenarios
-docs/        MkDocs site (mkdocs serve to browse locally)
+tools/       helper scripts (public-safety check, benchmarks, plotting, conducted test,
+             visibility, sky link budget)
+docs/        MkDocs site (uv run mkdocs serve to browse locally)
 ```
 
 ## Spreading-code verification
@@ -54,16 +101,42 @@ independently of the generator:
 - NavIC L5/S SPS PRN 1–14: IRNSS SIS ICD for SPS v1.1, Table 7 (first 10 chips, octal)
 - GPS L1 C/A PRN 1–10: IS-GPS-200, Table 3-Ia
 
-## Documentation
+## How this project is developed
 
-The `docs/` directory is an MkDocs site. Install it with `uv sync` and build it with
-`uv run mkdocs serve`. It will be published on GitHub Pages when the repository becomes public.
+Most of the code and documentation was written by AI agents (Claude Code) working from
+GitHub issues, and pull requests are also reviewed by Greptile. The maintainer sets the
+direction, approves plans, makes the design decisions recorded in
+[the decision log](docs/project/decisions.md), and runs all hardware tests. The process is
+described in [Agent orchestration](docs/development/orchestration.md). Commits written by
+agents carry a `Co-Authored-By` line, and contributions are signed off under the
+[Developer Certificate of Origin](https://developercertificate.org/) (`CONTRIBUTING.md`).
+
+This is a research tool maintained in spare time. Issues and pull requests are welcome, but
+responses may be slow. `CONTRIBUTING.md` lists the sign-off and the checks to run before a
+pull request.
 
 ## Safety
 
-snappnt never transmits. It writes playback files and builds command lines for a person to
-review. Conducted tests must use cables and attenuators only — no antennas on generators.
-See `docs/guides/conducted-test.md`.
+- snappnt never transmits. It writes playback files and builds command lines for a person to
+  review and run.
+- Conducted tests use cables and attenuators only. Never connect an antenna to a generator.
+- The emission of the conducted-test bench (leakage from cables, attenuators and the
+  generator) has **not** been measured against any regulatory limit (issue #57). Whoever runs a
+  transmitter, even into a closed cable path, is responsible for complying with the radio
+  regulations where they are.
+- See [Conducted test](docs/guides/conducted-test.md) for the procedure and its safety rules.
+
+## Related software
+
+The ESP-SDR firmware that runs on the ESP32 boards is a separate project under GPL-3.0 and is
+not part of this repository; snappnt only talks to it over a USB serial link, and no
+firmware code is copied into snappnt (decision D-015 in
+[the decision log](docs/project/decisions.md)).
+
+## Citing
+
+If you use snappnt in published work, please cite it. A DOI (Zenodo) will be added with the
+first release; until then, cite the repository URL and the commit.
 
 ## License
 

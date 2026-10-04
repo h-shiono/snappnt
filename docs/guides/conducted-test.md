@@ -21,6 +21,9 @@ In a conducted test the signal generator feeds the ESP32 through cables and atte
   in a metal box.
 - Connect the whole chain before transmission starts, and stop transmission before
   disconnecting anything. Start with the full attenuation and the lowest transmit gain.
+- The emission of this bench (leakage from the generator, cables and attenuators) has **not**
+  been measured against any regulatory limit (issue #57). Whoever transmits, even into a closed
+  cable path, is responsible for complying with the radio regulations where they are.
 - Check the regulations that apply where you are; this page is not legal advice.
 
 ## Connection

@@ -165,8 +165,25 @@ uv run python tools/sky_link_budget.py --antenna-gain-dbic 3 --antenna-temp-k 10
   minimum).
 - **Receiver NF.** TODO: the noise figure of the ESP32 radio at its antenna pin is not given
   in any document this project has found. It is shown as 5, 10 and 15 dB. The conducted test
-  (issue #11) can measure it: a known input level and the measured C/N0 give the noise figure
-  through the conducted-test calculator (`snappnt link-budget`).
+  (issue #11) did not measure it: the input level at the ESP32 was not known, because no power
+  meter or calibrated noise source was available ([Conducted test (M3)](../results/conducted-m3.md),
+  "Not verified"). What would measure it: captures of the generator's signal **without noise
+  added in software** (in the M3 runs that noise dominates the receiver's own noise), at an
+  input level at the antenna pin that is known from a power meter or a calibrated noise
+  source. With P_in the signal power at the antenna pin in dBm and C/N0 the value estimated
+  from those captures (`cn0_dbhz_est` of `acquire`, whose bias is measured in
+  [C/N0 estimate bias](../results/cn0-bias.md)), NF = P_in − C/N0 + 174.0 dB, where
+  −174.0 dBm/Hz is kT at 290 K. This is the relation of `cn0_dbhz` in
+  `src/snappnt/eval/linkbudget.py` solved for NF; `snappnt link-budget` takes NF as an input
+  and does not do this inversion. `cn0_dbhz_est` is biased low, and `acquire` does not
+  correct it: in the simulated ESP32-C3 condition the mean bias is −0.76 dB at 54 dB-Hz and
+  −3.11 dB at 62 dB-Hz, mainly because the signal itself raises the noise-floor estimate, and
+  a frequency offset between bins or a data-symbol sign change inside the snapshot adds more.
+  Used without correction, it would make the NF too high by about the size of the bias. So
+  choose an input level that gives a C/N0 a few dB above the detection limit, average the
+  estimate over many captures, and correct it by the mean bias simulated for the same
+  condition and C/N0 (true C/N0 ≈ estimate − bias). The NF obtained this way is an estimate
+  whose uncertainty includes that of the bias correction.
 - **Implementation losses** after the receiver input (quantisation, filtering, short
   snapshots) are not part of this calculation; they are included in the simulated detection
   curves that the result is compared with.
