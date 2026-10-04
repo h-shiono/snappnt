@@ -52,7 +52,9 @@ This can be added as a local git pre-commit hook.
 `CITATION.cff` names the maintainer on purpose, because a citation needs an author and the
 maintainer chose to publish their name there. The maintainer's own private-terms list may
 contain that name, so the two name lines in `CITATION.cff` carry the `public-safety: ignore`
-marker, which lets the local check pass without removing the name from the list.
+marker. The marker covers only those two lines. Other files carry the GitHub handle and the
+copyright line in `LICENSE`, without the marker, so a list entry that also matches those (for
+example the family name alone, which is part of the handle) is still reported there.
 
 ## Photos
 

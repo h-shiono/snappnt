@@ -71,21 +71,25 @@ would make Zenodo ignore `CITATION.cff` entirely).
 Before a release, the version number is set to the same value in `pyproject.toml`,
 `src/snappnt/__init__.py` (`__version__`) and `CITATION.cff`, and `uv.lock` is regenerated
 with `uv lock`. CI runs `uv sync --locked`, which fails if `uv.lock` does not match
-`pyproject.toml`.
+`pyproject.toml`. The planned release date is set in `CITATION.cff` (`date-released`, in the
+form `YYYY-MM-DD`) in a pull request merged just before the release, so that the
+`CITATION.cff` archived by Zenodo for that version already carries its date.
 
 Steps for a release, in order:
 
-1. The pull requests that belong to the release are merged.
+1. The pull requests that belong to the release are merged, including the one that sets
+   `date-released`.
 2. The repository is public and GitHub Pages is enabled (needed once, before the first
    release).
 3. Zenodo's GitHub integration is enabled for the repository (needed once, before the first
    release).
 4. The maintainer creates the GitHub release `vX.Y.Z`, where `X.Y.Z` is the version in
-   `pyproject.toml`. Zenodo archives it and mints the DOI; the PyPI publishing workflow
-   (issue #67) publishes the same version.
+   `pyproject.toml`. Zenodo archives it and mints the DOI. A workflow that publishes the same
+   version to PyPI on each GitHub release is planned in issue #67; until that workflow is
+   merged, a GitHub release publishes nothing to PyPI.
 5. After the first release, the concept DOI is added to `CITATION.cff` and to the "Citing"
-   section of the README. After each release, the release date is set in `CITATION.cff`
-   (`date-released`).
+   section of the README. The concept DOI does not change with later releases, so this step is
+   needed only once.
 
 ## Writing style
 
