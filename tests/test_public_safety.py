@@ -199,6 +199,58 @@ def test_jpeg_xmp_without_listed_properties_passes(tmp_path):
     assert write_and_scan(tmp_path, "xmp.jpg", jpeg_bytes(_segment(0xE1, xmp))) == []
 
 
+def xmp_app1(description):
+    """A JPEG APP1 segment holding a well-formed XMP packet with one rdf:Description."""
+    packet = (
+        '<?xpacket begin="\ufeff" id="W5M0MpCehiHzreSzNTczkc9d"?>'
+        '<x:xmpmeta xmlns:x="adobe:ns:meta/">'
+        '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+        f"{description}</rdf:RDF></x:xmpmeta>" + " " * 64 + '<?xpacket end="w"?>'
+    )
+    return _segment(0xE1, b"http://ns.adobe.com/xap/1.0/\x00" + packet.encode("utf-8"))
+
+
+@pytest.mark.parametrize(
+    ("description", "reason"),
+    [
+        (
+            '<rdf:Description xmlns:g="http://example.com/g/" g:GPSLatitude="12,30.0N"/>',
+            cps.GPS_FINDING,
+        ),
+        (
+            '<rdf:Description xmlns:c="http://example.com/c/"><c:Model>X</c:Model>'
+            "</rdf:Description>",
+            cps.CAMERA_FINDING,
+        ),
+        (
+            '<rdf:Description xmlns:xmp="http://ns.adobe.com/xap/1.0/" '
+            'xmp:CreateDate="2026-01-01T00:00:00"/>',
+            cps.DATE_FINDING,
+        ),
+    ],
+)
+def test_well_formed_xmp_property_is_a_finding(tmp_path, description, reason):
+    data = jpeg_bytes(xmp_app1(description))
+    assert write_and_scan(tmp_path, "xmp.jpg", data) == [reason]
+
+
+def test_well_formed_xmp_text_mentioning_a_property_passes(tmp_path):
+    description = (
+        '<rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        "<dc:description>Notes on foo:Model and exif:GPSLatitude=1</dc:description>"
+        "</rdf:Description>"
+    )
+    assert write_and_scan(tmp_path, "xmp.jpg", jpeg_bytes(xmp_app1(description))) == []
+
+
+def test_xmp_with_doctype_is_searched_as_bytes(tmp_path):
+    xmp = (
+        b'http://ns.adobe.com/xap/1.0/\x00<!DOCTYPE x [<!ENTITY a "b">]>'
+        b'<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:e="e" e:GPSLatitude="&a;"/>'
+    )
+    assert write_and_scan(tmp_path, "dtd.jpg", jpeg_bytes(_segment(0xE1, xmp))) == [cps.GPS_FINDING]
+
+
 def test_jpeg_embedded_image_with_xmp_gps_is_a_finding(tmp_path):
     xmp = b'http://ns.adobe.com/xap/1.0/\x00<rdf:Description exif:GPSLatitude="1"/>'
     data = jpeg_bytes() + jpeg_bytes(_segment(0xE1, xmp))

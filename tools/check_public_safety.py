@@ -15,15 +15,16 @@ In image files (JPEG, PNG, WebP, TIFF), the metadata a camera or phone writes:
     DateTimeDigitized, and the PNG text keyword "Creation Time"
   * camera make and model (EXIF Make and Model, XMP properties Make and Model, PNG text
     keywords exif:Make and exif:Model)
-XMP properties are matched by name after any namespace prefix. EXIF and XMP are read from JPEG APP1
-segments (including those of further images appended after the main one), PNG eXIf chunks and text
-chunks, WebP EXIF and XMP chunks, and TIFF files (including the XMP tag). An EXIF block without
-these tags (for example Orientation only) is not a finding. The PNG text keywords "date:create",
-"date:modify" and "date:timestamp" and the PNG tIME chunk, which ImageMagick and other tools write
-with the time they wrote the file, are not findings on purpose: they say when the file was written,
-not when or where a photo was taken. Metadata that cannot be parsed is a finding, because it cannot
-be shown to be clean. HEIC, HEIF and AVIF files are not parsed and are always findings. Parsing uses
-the standard library only.
+XMP properties are matched by local name in any namespace (XMP is parsed as XML; a packet that is
+not well-formed XML is searched as bytes instead). EXIF and XMP are read from JPEG APP1 segments
+(including those of further images appended after the main one), PNG eXIf chunks and text chunks,
+WebP EXIF and XMP chunks, and TIFF files (including the XMP tag). An EXIF block without these tags
+(for example Orientation only) is not a finding. The PNG text keywords "date:create", "date:modify"
+and "date:timestamp" and the PNG tIME chunk, which ImageMagick and other tools write with the time
+they wrote the file, are not findings on purpose: they say when the file was written, not when or
+where a photo was taken. Metadata that cannot be parsed is a finding, because it cannot be shown to
+be clean. HEIC, HEIF and AVIF files are not parsed and are always findings. Parsing uses the
+standard library only.
 
 Optional: SNAPPNT_PRIVATE_TERMS=<file outside the repository> adds case-insensitive terms,
 one per line. That file must never be committed.
@@ -44,6 +45,7 @@ import subprocess
 import sys
 import zlib
 from pathlib import Path
+from xml.etree import ElementTree
 
 ALLOWED_EMAILS = {
     "noreply@anthropic.com",
@@ -84,8 +86,12 @@ XMP_HEADER = b"http://ns.adobe.com/"
 EMBEDDED_APP1 = re.compile(
     rb"\xff\xe1..(?:Exif\x00\x00(?:II\*\x00|MM\x00\*)|http://ns\.adobe\.com/)", re.DOTALL
 )
-# XMP properties are matched by local name after any namespace prefix: the prefix is only an
-# alias for the namespace URI, so a writer may use "gps:" or "ns1:" as well as "exif:".
+# XMP properties are matched by local name in any namespace: the prefix is only an alias for
+# the namespace URI, so a writer may use "gps:" or "ns1:" as well as "exif:".
+XMP_DATE_NAMES = {"CreateDate", "DateCreated", "DateTimeOriginal", "DateTimeDigitized"}
+XMP_CAMERA_NAMES = {"Make", "Model"}
+# Used only when an XMP packet is not well-formed XML; these also match text that merely looks
+# like a property name, which errs towards a finding.
 XMP_PATTERNS = (
     (re.compile(rb":GPS[A-Za-z]+\b"), GPS_FINDING),
     (
@@ -178,10 +184,40 @@ def scan_exif(tiff: bytes, reasons: set[str]) -> None:
                 pending.append((struct.unpack(order + "I", tiff[next_at : next_at + 4])[0], kind))
 
 
+def _xmp_names(xmp: bytes) -> list[str] | None:
+    """Return the local names of all elements and attributes of an XMP packet.
+
+    Returns None when the packet is not well-formed XML (for example one part of an extended
+    XMP packet) or declares a DOCTYPE, which is not parsed to rule out entity expansion.
+    """
+    start = xmp.find(b"<")
+    if start < 0 or b"<!DOCTYPE" in xmp:
+        return None
+    try:
+        root = ElementTree.fromstring(xmp[start:].rstrip(b"\x00"))
+    except ElementTree.ParseError:
+        return None
+    names = []
+    for element in root.iter():
+        names.append(element.tag)
+        names.extend(element.attrib)
+    return [name.rpartition("}")[2] for name in names]
+
+
 def scan_xmp(xmp: bytes, reasons: set[str]) -> None:
-    for pattern, reason in XMP_PATTERNS:
-        if pattern.search(xmp):
-            reasons.add(reason)
+    names = _xmp_names(xmp)
+    if names is None:
+        for pattern, reason in XMP_PATTERNS:
+            if pattern.search(xmp):
+                reasons.add(reason)
+        return
+    for name in names:
+        if name.startswith("GPS"):
+            reasons.add(GPS_FINDING)
+        elif name in XMP_DATE_NAMES:
+            reasons.add(DATE_FINDING)
+        elif name in XMP_CAMERA_NAMES:
+            reasons.add(CAMERA_FINDING)
 
 
 def _scan_jpeg(data: bytes, reasons: set[str]) -> None:
