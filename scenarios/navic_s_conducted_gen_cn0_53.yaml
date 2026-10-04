@@ -1,0 +1,14 @@
+# M3 conducted test: waveform for the generator (B210 clone or HackRF), one second loop
+# (= 50 NavIC data symbols, so the loop point does not break a symbol).
+# Noise is added in software so C/N0 is set here, not by the attenuators.
+# Run:  snappnt sim scenarios/navic_s_conducted_gen_cn0_53.yaml --uhd --hackrf
+name: navic_s_conducted_gen_cn0_53
+signal: navic_s_sps
+seed: 4
+receiver:
+  sample_rate_hz: 8000000
+  n_samples: 8000000
+  baseband_offset_hz: 1500000   # keep the generator's LO leakage away from the signal
+  clock_offset_ppm: 0
+satellites:
+  - {prn: 10, cn0_dbhz: 53, doppler_hz: 0, code_phase_chips: 0.0}

@@ -1,0 +1,13 @@
+# M3 conducted test: noise-only waveform for the generator, one second loop. Same receiver
+# block as navic_s_conducted_gen.yaml but no satellite, to measure false alarms under the
+# noise of the playback (issue #11).
+# Run:  snappnt sim scenarios/navic_s_conducted_gen_noise.yaml --uhd
+name: navic_s_conducted_gen_noise
+signal: navic_s_sps
+seed: 4
+receiver:
+  sample_rate_hz: 8000000
+  n_samples: 8000000
+  baseband_offset_hz: 1500000   # keep the generator's LO leakage away from the signal
+  clock_offset_ppm: 0
+satellites: []

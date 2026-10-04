@@ -350,3 +350,28 @@ an earlier one and says so.
   satellite over a spherical Earth; the NVS-01 TLE gives sub-satellite longitudes of 129.38
   to 129.55 degrees east over 2026-10-03, against the published slot of 129.5 degrees east
   (`tests/test_visibility.py`).
+
+## D-022 Detection on real captures: threshold and bracketed frequency, no code-phase check (2026-10-04)
+
+- **Decision:** In the conducted test (`tools/conducted_pd.py pd`), a capture counts as a
+  detection when its detection metric is above the threshold for `pfa` = 1e-3 over the search
+  grid and its frequency is within one bin of the run's reference frequency. The reference is
+  the mean of the median detected frequencies of two runs of 20 captures at 60 dB-Hz taken
+  just before and just after the run (brackets). If the two brackets differ by more than one
+  bin, the tolerance is two bins. The code phase is not checked. The receiver's gain index and
+  analog bandwidth are fixed for all runs (no AGC), and every capture is acquired with
+  `--remove-dc mean`. Issue #11.
+- **Why:** For a real capture neither the code phase (the generator loops freely and the
+  capture is not synchronised to it) nor the carrier offset (two independent crystals) is
+  known. At 60 dB-Hz every capture is detected, so the brackets give the frequency the receiver
+  sees at that time, and bracketing each run follows the drift of the crystals with
+  temperature (1 ppm together is about one bin of a 0.2 ms capture at 2492 MHz). A fixed gain
+  keeps the conditions the same for all runs and is recorded; the AGC's choice is not
+  reported by the firmware. The simulated curve the test is compared with has no DC offset.
+- **Alternatives:** Checking the code phase against a time reference shared by generator and
+  receiver (not available with these devices). One reference frequency for the whole
+  session (wrong after a drift of more than a bin; seen after the receiver was powered up
+  again). Hardware AGC (the gain differs from capture to capture and is not recorded).
+- **Verified:** in the conducted test of 2026-10-04 all nine brackets had their median in the
+  same bin, so the one-bin tolerance was used for every run
+  ([Conducted test](../results/conducted-m3.md)).

@@ -24,6 +24,13 @@ SCENARIO_HASHES = {
     "cband_bpsk_generic_lowside": "b62436e37a4276863314b2f06afe827de8f33d73bff6fa1bf369f71882a36f35",
     "cband_leo_overhead": "d782d41d6023ef0f83b9b3b8a1771ba377694b92a1aad43d5064252210862dba",
     "navic_s_conducted_gen": "6bf1276ee50b7ecac5a9cf73c5860f9a3f8a8206fecece0cbd8de50eb56c8ae5",
+    # Added with the files for the conducted test (issue #11), hashed when they were added.
+    "navic_s_conducted_gen_cn0_50": "50164cd6dbfcc6b9ec5f824e286e11c39ed76500abe77f2e65de121ecfd20cdf",
+    "navic_s_conducted_gen_cn0_51": "1179ff44da08b63787b85175d7c12801427814d67ea70e6c3cf442db08f10b0c",
+    "navic_s_conducted_gen_cn0_52": "f9ff79b0b0d9bf974ee795e77f9b3f27de28f8223f214a5be8f98a64bb96e786",
+    "navic_s_conducted_gen_cn0_53": "26785cdd1c1c11d727bb9199c8350ac426ac65284c8fcad11326455f7a570a32",
+    "navic_s_conducted_gen_cn0_55": "8f777c2ce9ae55438278b62e974aab31c7ddf33ec9edd8bac23c0422f5283c2e",
+    "navic_s_conducted_gen_noise": "bb9d8b81a951b026e101c2434514d07f72e5dc365a6de434bd0b0923e2d29e1c",
     "navic_s_esp32c3": "7919bd9d23f0d6e7c39016cf699647a889ee667bcea84b89e16578e49cb57201",
     "navic_s_esp32c61_4msps": "a5eb5d56b9fcc66d254e4f05488b3231457c238475b53b9c984acc48dfabb336",
     "navic_s_esp32c61_aliasing_ideal": "474287ba5ba2c9f4170a22ff1e64b5916648ffb4228d87c99b9717d099291f74",

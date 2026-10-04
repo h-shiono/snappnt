@@ -16,6 +16,11 @@ In a conducted test the signal generator feeds the ESP32 through cables and atte
   ESP32 input.
 - snappnt never starts a transmission. It only writes playback files and builds command lines
   for a person to check and run.
+- Terminate the generator's unused ports with 50 Ω loads (on a B210-class USRP: the other port
+  of the channel in use and both ports of the other channel). Keep a bare board in its case or
+  in a metal box.
+- Connect the whole chain before transmission starts, and stop transmission before
+  disconnecting anything. Start with the full attenuation and the lowest transmit gain.
 - Check the regulations that apply where you are; this page is not legal advice.
 
 ## Connection
@@ -31,6 +36,41 @@ B210-class USRP (TX) ─ 30 dB ─ splitter ─┬─ 30 dB ─ DC block ─ XIA
   acquires the signal and the ESP32 does not, the problem is on the ESP32 side (capture, gain,
   or tuning).
 - The attenuator values are a starting point. Begin with 60–70 dB in total.
+
+### Without a splitter
+
+When no divider is available (as in the test of
+[Conducted test of NavIC S-band SPS on the XIAO ESP32C3](../results/conducted-m3.md)), the
+generator feeds the ESP32 alone through the attenuators, and a reference receiver records the
+same playback afterwards in place of the ESP32. This replaces the simultaneous reference only
+in part: anything that changes between the two recordings is not seen.
+
+### Setting the level without a power meter
+
+The noise in the playback must be well above the receiver's own noise (the 10 dB margin of
+`snappnt link-budget`, decision D-012). Without a power meter this is checked on the receiver:
+
+1. Fix the receiver's gain index and analog bandwidth (`--gain <index> --bandwidth-mhz <MHz>`)
+   for the whole test.
+2. Take 20 captures with the generator off and 20 with the 60 dB-Hz playback on, and compare
+   them with `tools/conducted_pd.py rise <off> <on>`. It reports the rise of the power
+   spectral density in the generator's band, without the generator's LO leakage line and the
+   bins near 0 Hz, and the fraction of samples at the ends of the converter's range.
+3. Raise the transmit gain until the rise is at least 10 dB and no sample is at the ends of
+   the range.
+
+With a B210 clone, 60 dB of attenuation, gain index 60 and 14 MHz bandwidth on a XIAO
+ESP32C3, a transmit gain of 60 dB gave a rise of about 18 dB; 0 and 20 dB gave no measurable
+rise.
+
+### Leak check
+
+After the level is set, stop transmission, take the receiver's cable off the last part of
+the chain (for example the DC block), play the 60 dB-Hz file at the same gain and capture
+again, and compare with generator-off captures taken in the same arrangement. The in-band rise
+must be below 1 dB; otherwise the signal reaches the receiver by another path, and the layout
+must be changed. Also acquire these captures: a leak too weak to raise the power can still be
+detected by correlation, which matters for the weak-signal test at the end of this page.
 
 ## Input level and C/N0 calculator
 
@@ -153,8 +193,25 @@ snappnt capture --dry-run --freq-hz 2492e6        # print the commands, send not
   `snappnt:espsdr_gain_reply`, `snappnt:espsdr_gain_mode`, `snappnt:espsdr_gain_index`,
   `snappnt:espsdr_transfer_bits`, `snappnt:espsdr_capture_us`. The serial port name, host name,
   user name and output path are not recorded.
-- **Not verified on hardware.** The command sequence follows the protocol page
-  (`docs/design/espsdr-protocol.md`); verification is tracked in issue #11.
+- **Verified on hardware** in the conducted test of issue #11
+  ([Conducted test of NavIC S-band SPS on the XIAO ESP32C3](../results/conducted-m3.md)): on one
+  XIAO ESP32C3, 2 180 captures kept (of 2 200 taken) with `--gain 60 --bandwidth-mhz 14` at 2492 MHz, each with
+  `GAIN MANUAL 60 0 79 1` and `LPF 63 34 34` recorded; the NavIC signal was acquired in them.
+
+## Practical notes from the first test
+
+- **Underruns.** `tx_samples_from_file` printed `U` (underrun) now and then at 8 MSa/s over
+  USB 3. With `--args "num_send_frames=512"` it printed `U` only when stopped with Ctrl-C.
+  Record whether `U` appears during a run; repeat a run with underruns.
+- **Warm-up.** After the XIAO was plugged in again, its carrier frequency moved by about
+  5 kHz (two bins of a 0.2 ms capture) within a few minutes. Keep the receiver powered and
+  check that the frequency is stable (for example three sets of 20 captures, two minutes
+  apart, in the same bin) before measuring.
+- **Brackets.** Take 20 captures at 60 dB-Hz before and after each run; the detection
+  criterion uses their frequency (decision D-022).
+- **Confirm transmission.** Check that the generator prints its "Press Ctrl + C to stop
+  streaming" line before capturing; a run captured before the generator had started showed
+  no rise and no detection.
 
 ## Next step: a weak signal without added noise
 
