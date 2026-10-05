@@ -4,9 +4,11 @@ This page prepares the first reception of a real NavIC satellite from the sky: t
 S-band Standard Positioning Service (SPS) signal at 2492.028 MHz, mainly from NVS-01 in
 geostationary orbit. It covers which satellites can be seen and where, how strong the signal
 is expected to be at the receiver input, which parts the receive chain needs, how captures
-can be time-stamped, and an outline of the test. Nothing has been received from the sky yet;
-every C/N0 on this page is an estimate. Parts are listed as candidates only; choosing and
-buying them is the maintainer's decision (GitHub issue #14).
+can be time-stamped, and an outline of the test. The first reception from the sky, with a
+B210 clone on 2026-10-04, is recorded in
+[First NavIC S-band acquisition from the sky](../results/sky-first-acquisition.md); every other
+C/N0 on this page is an estimate. Parts are listed as candidates only; choosing and buying them
+is the maintainer's decision (GitHub issue #14).
 
 Symbols used on this page:
 
@@ -62,9 +64,41 @@ With three satellites in service, NavIC alone cannot give a position fix (four u
 three position coordinates and the receiver clock). Milestone M5 is about acquisition:
 finding the signal, its code phase and its carrier frequency offset in a snapshot.
 
-TODO: whether satellites with failed clocks still transmit an S-band signal, and with which
-codes, is not known to this project. A capture would show it, but a detection of their PRN
-does not by itself mean that their navigation data is usable.
+### Satellites with failed clocks
+
+*Inference, from the first sky recording:* satellites whose atomic clocks are reported to
+have failed still transmit an S-band SPS signal with their PRN. Their carrier frequency comes
+from a less stable reference. The evidence:
+
+- **Reports of failed clocks** (secondary sources):
+  - IRNSS-1E's atomic clocks are reported to have failed.
+  - For IRNSS-1G, the clock status is reported only indirectly: like IRNSS-1E, it is reported
+    to be used only for NavIC's short message broadcast service.
+  - Source for both:
+    [Wikipedia, Indian Regional Navigation Satellite System](https://en.wikipedia.org/wiki/Indian_Regional_Navigation_Satellite_System).
+  - Neither satellite is among the three named in the Lok Sabha reply above.
+- **Reception.** In the recording of
+  [First NavIC S-band acquisition from the sky](../results/sky-first-acquisition.md), PRN 7
+  (IRNSS-1G, inferred and not verified) is acquired with `snappnt acquire`. PRN 5 (IRNSS-1E per
+  [IGSMAIL-7272](https://lists.igs.org/pipermail/igsmail/2016/001106.html)) was acquired only
+  after narrow interference lines were removed, a step `snappnt` does not have yet.
+- **Carrier offsets.** In that recording PRN 10 (NVS-01, secondary sources) is at +9500 Hz and
+  PRN 7 at +6250 Hz from 2492.028 MHz. The receiver's clock error is the same for both PRNs, so
+  the difference of about 3.2 kHz (about 1.3 ppm) is on the satellite side: Doppler or the
+  satellite's own oscillator. The largest Doppler in the examples under "Doppler" below is
+  1448 Hz (IRNSS-1B, inclined geosynchronous orbit); a geostationary satellite's Doppler is below
+  100 Hz there. A Doppler difference of 3.2 kHz is therefore unlikely, which leaves the
+  oscillator. A working atomic clock would hold the carrier within a few hertz.
+
+What the evidence does not show:
+
+- Which satellite has the offset reference: PRN 10, PRN 7 or both. Only the difference is
+  measured.
+- That the navigation data of these satellites is usable. A detection of a PRN does not show
+  that.
+
+TODO: settle with a recording of PRN 10 and PRN 7 against a receiver clock disciplined by GNSS,
+which gives each satellite's own carrier offset.
 
 ## Visibility
 
@@ -276,6 +310,25 @@ antenna (RHCP, 2492 MHz) → LNA → band-pass filter 2483.5–2500 MHz → cabl
   the rules of [Conducted test](conducted-test.md) about transmitting still apply to any
   transmission.
 
+### Practical notes from the first sky recording
+
+From [First NavIC S-band acquisition from the sky](../results/sky-first-acquisition.md), where
+earlier attempts that ignored these points gave no detection:
+
+- **Set the GQRX "Bandwidth" to the sample rate.** With 0, outside signals appeared only in a
+  narrow part of the band around the tune frequency (*inferred*: the analog filter was at its
+  minimum). The NavIC signal is then lost when it is not at the tune frequency.
+- **Connect the B210 directly to the computer, not through a USB hub.** Through a hub, a comb
+  of narrow lines appeared in the spectrum; connected directly, it did not.
+- **Power the LNA from a battery.** The first detections were made this way. A supply from
+  the computer's USB could bring the same kind of interference into the LNA as the hub did.
+  This is an *inference*; a comparison was not recorded.
+- **Keep the antenna away from USB cables,** for the same reason (*inference*).
+- **GQRX recordings.** The `_fc.raw` files written by GQRX's I/Q recorder are complex 32-bit
+  floats: convert them with `snappnt convert --format uhd-float`. The file name carries the
+  hardware tune frequency and the sample rate
+  (`gqrx_<date>_<time>_<frequency>_<rate>_fc.raw`). Pass that frequency to `--freq-hz`.
+
 ## Candidate parts
 
 Candidates found by a web search on 2026-10-03. Specifications are from the linked datasheet
@@ -420,13 +473,49 @@ usually within some milliseconds of UTC; this is a typical value, not measured h
 3. **Reference receiver first.** Record with a HackRF or USRP through the same antenna, LNA
    and filter: a few seconds at 4 to 8 MSa/s centred near 2492 MHz. Acquire with a long
    snapshot and a frequency search covering the receiver's crystal error. Record the
-   detected PRNs and the estimated C/N0.
+   detected PRNs and the estimated C/N0. The options for this are in "Acquiring a long
+   recording" below.
 4. **ESP32 receivers.** With the same chain, capture with `snappnt capture` and acquire. On
    the ESP32-C3 expect no detection at the ICD minimum power (see the link budget); on the
    ESP32-C61, capture 4 ms at 4 MSa/s when long captures are available (milestone M4).
 5. Write the result as a page under [Results](../results/index.md): C/N0 found by each
    receiver, detection or not, and the comparison with this page's estimates. No receiver
    position is written.
+
+### Acquiring a long recording
+
+A recording of several seconds is acquired in segments of up to about 1 s, with
+non-coherent integration over many 4 ms blocks. Two options of `snappnt acquire` are made for
+this, as used in
+[First NavIC S-band acquisition from the sky](../results/sky-first-acquisition.md):
+
+```bash
+uv run snappnt acquire out/sky/rec --signal navic_s_sps --center <offset_hz> --code-doppler \
+    --freq-span 30000 --start-s 1 --duration-s 1 --blocks 250
+```
+
+- **`--code-doppler`** (GitHub issue #72). A carrier offset f also changes the code rate, by the
+  factor f / 2492.028 MHz. Over 1 s, an offset of 10 kHz moves the code by about 4 chips. This
+  option scales the replica's chip rate with the frequency bin, in groups of bins, so that the
+  code stays aligned over the whole segment.
+  - It is for direct reception only, where one clock drives the LO and the sample clock, as
+    with a HackRF, a USRP or an ESP32.
+  - With an external mixer, an LO error moves the carrier without changing the code rate.
+    `snappnt acquire` and `snappnt sweep` refuse the option when the frequency plan has an
+    external LO.
+- **`--start-s` and `--duration-s`** (GitHub issue #73) select a segment of the recording, in
+  seconds from its first sample. Only that segment is read from the file.
+  - The reported code phase refers to the first sample of the segment, not of the file.
+  - For a simulated recording, the truth is compared only when the segment starts at the
+    first sample.
+- **`--center`** is where the carrier sits in the recording's baseband with zero Doppler and
+  zero clock error: 2492.028 MHz minus the tune frequency. For example, 2028500 Hz for a
+  recording tuned to 2489.9995 MHz.
+- Frequency refinement is off in `snappnt acquire`. Carrier offsets are reported on the bin
+  grid (125 Hz for 4 ms blocks) and code phases on the sample grid.
+- Narrow interference lines can make every PRN read as detected on a real recording. Check
+  the threshold with codes that are not transmitted at S band, such as the NavIC L5 codes
+  (`--signal navic_l5_sps`), and see GitHub issue #80.
 
 ## Open decisions (maintainer)
 

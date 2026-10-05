@@ -15,5 +15,6 @@ Recorded pages:
 | [ESP32-C3 bench checks without an RF source](esp32c3-bench-no-rf.md) | #41 |
 | [Removing the DC offset before acquisition](dc-removal.md) | #43 |
 | [Conducted test of NavIC S-band SPS on the XIAO ESP32C3](conducted-m3.md) | #11 |
+| [First NavIC S-band acquisition from the sky](sky-first-acquisition.md) | #74 |
 
 When adding a page, also add it to the `nav` section of `mkdocs.yml`.

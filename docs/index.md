@@ -9,8 +9,10 @@ checked automatically against known truth.
 
 !!! note "Status"
     Research software, early stage. The receive chain has been verified in a conducted test
-    (cables and attenuators, nothing radiated). **No satellite signal has been received from the
-    sky yet.** Not affiliated with ESPARGOS or Espressif.
+    (cables and attenuators, nothing radiated). **NavIC S-band SPS has been received from the
+    sky with a B210-class SDR**
+    ([first sky acquisition](results/sky-first-acquisition.md)). **Acquisition from the sky
+    with an ESP32 has not been shown yet.** Not affiliated with ESPARGOS or Espressif.
 
 ## Why snapshots
 
