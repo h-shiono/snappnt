@@ -8,11 +8,16 @@ strict: true
 theme:
   name: material
   features:
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.indexes
     - navigation.top
     - content.code.copy
     - search.highlight
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/satellite-uplink
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
