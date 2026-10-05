@@ -3,6 +3,8 @@ message: "If you use snappnt in published work, please cite it as below."
 type: software
 title: snappnt
 version: 0.1.0
+date-released: 2026-10-05
+doi: 10.5281/zenodo.23163934
 license: BSD-2-Clause
 repository-code: "https://github.com/h-shiono/snappnt"
 abstract: >-
