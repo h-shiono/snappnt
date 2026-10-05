@@ -157,6 +157,12 @@ The same install-and-run check runs on every pull request as the `wheel` job of
 2. In the GitHub repository settings, under "Environments", create the environment `pypi`.
    Optionally add the maintainer as a required reviewer; the `publish` job then waits for
    approval in the Actions tab before it receives the token and uploads.
+   If "Deployment branches and tags" is set to "Selected branches and tags", add the rule for
+   release tags with "Ref type" **Tag** and the pattern `v*`. A rule added with the default
+   "Ref type" "Branch" matches no tag, and the `publish` job is then refused with
+   `Tag "v0.1.0" is not allowed to deploy to pypi due to environment protection rules` (with
+   the tag of the release). After fixing the rule, "Re-run failed jobs" on the failed run is
+   enough, because nothing reached PyPI.
 
 Until both are done, the `publish` job of a release fails at the upload and nothing reaches
 PyPI. A version once uploaded cannot be uploaded again, even after it is deleted on PyPI, so a

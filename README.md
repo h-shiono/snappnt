@@ -1,5 +1,7 @@
 # snappnt
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23163934.svg)](https://doi.org/10.5281/zenodo.23163934)
+
 Snapshot PNT receiver toolkit for low-cost front ends.
 
 snappnt pairs a signal simulator with a snapshot acquisition engine, so that short captures
@@ -150,8 +152,10 @@ firmware code is copied into snappnt (decision D-015 in
 
 ## Citing
 
-If you use snappnt in published work, please cite it. A DOI (Zenodo) will be added with the
-first release; until then, cite the repository URL and the commit.
+If you use snappnt in published work, please cite it with the DOI
+[10.5281/zenodo.23163934](https://doi.org/10.5281/zenodo.23163934) (Zenodo). This DOI always
+resolves to the latest version. Each version also has its own DOI, listed on the Zenodo page;
+use that one to cite an exact version.
 
 ## License
 

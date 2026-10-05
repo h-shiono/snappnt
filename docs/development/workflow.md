@@ -104,8 +104,10 @@ Steps for a release, in order:
    A version number can be uploaded to PyPI only once, even after it is deleted there, so a
    wrong upload is corrected with a new release and a new version number.
 6. After the first release, the concept DOI is added to `CITATION.cff` and to the "Citing"
-   section of the README. The concept DOI does not change with later releases, so this step is
-   needed only once.
+   section of the README. This was done after `v0.1.0`, released on 2026-10-05: the concept DOI
+   is `10.5281/zenodo.23163934`. The concept DOI does not change with later releases, so this
+   step is not needed again. (`v0.1.0` was released without `date-released` in `CITATION.cff`;
+   the field was added together with the concept DOI.)
 
 ## Writing style
 
