@@ -4,9 +4,11 @@ This page prepares the first reception of a real NavIC satellite from the sky: t
 S-band Standard Positioning Service (SPS) signal at 2492.028 MHz, mainly from NVS-01 in
 geostationary orbit. It covers which satellites can be seen and where, how strong the signal
 is expected to be at the receiver input, which parts the receive chain needs, how captures
-can be time-stamped, and an outline of the test. Nothing has been received from the sky yet;
-every C/N0 on this page is an estimate. Parts are listed as candidates only; choosing and
-buying them is the maintainer's decision (GitHub issue #14).
+can be time-stamped, and an outline of the test. The first reception from the sky, with a
+B210 clone on 2026-10-04, is recorded in
+[First NavIC S-band acquisition from the sky](../results/sky-first-acquisition.md); every other
+C/N0 on this page is an estimate. Parts are listed as candidates only; choosing and buying them
+is the maintainer's decision (GitHub issue #14).
 
 Symbols used on this page:
 
@@ -62,9 +64,41 @@ With three satellites in service, NavIC alone cannot give a position fix (four u
 three position coordinates and the receiver clock). Milestone M5 is about acquisition:
 finding the signal, its code phase and its carrier frequency offset in a snapshot.
 
-TODO: whether satellites with failed clocks still transmit an S-band signal, and with which
-codes, is not known to this project. A capture would show it, but a detection of their PRN
-does not by itself mean that their navigation data is usable.
+### Satellites with failed clocks
+
+*Inference, from the first sky recording:* satellites whose atomic clocks are reported to
+have failed still transmit an S-band SPS signal with their PRN. Their carrier frequency comes
+from a less stable reference. The evidence:
+
+- **Reports of failed clocks** (secondary sources):
+  - IRNSS-1E's atomic clocks are reported to have failed.
+  - For IRNSS-1G, the clock status is reported only indirectly: like IRNSS-1E, it is reported
+    to be used only for NavIC's short message broadcast service.
+  - Source for both:
+    [Wikipedia, Indian Regional Navigation Satellite System](https://en.wikipedia.org/wiki/Indian_Regional_Navigation_Satellite_System).
+  - Neither satellite is among the three named in the Lok Sabha reply above.
+- **Reception.** In the recording of
+  [First NavIC S-band acquisition from the sky](../results/sky-first-acquisition.md), PRN 7
+  (IRNSS-1G, inferred and not verified) is acquired with `snappnt acquire`. PRN 5 (IRNSS-1E per
+  [IGSMAIL-7272](https://lists.igs.org/pipermail/igsmail/2016/001106.html)) was acquired only
+  after narrow interference lines were removed, a step `snappnt` does not have yet.
+- **Carrier offsets.** In that recording PRN 10 (NVS-01, secondary sources) is at +9500 Hz and
+  PRN 7 at +6250 Hz from 2492.028 MHz. The receiver's clock error is the same for both PRNs, so
+  the difference of about 3.2 kHz (about 1.3 ppm) is on the satellite side: Doppler or the
+  satellite's own oscillator. The largest Doppler in the examples under "Doppler" below is
+  1448 Hz (IRNSS-1B, inclined geosynchronous orbit); a geostationary satellite's Doppler is below
+  100 Hz there. A Doppler difference of 3.2 kHz is therefore unlikely, which leaves the
+  oscillator. A working atomic clock would hold the carrier within a few hertz.
+
+What the evidence does not show:
+
+- Which satellite has the offset reference: PRN 10, PRN 7 or both. Only the difference is
+  measured.
+- That the navigation data of these satellites is usable. A detection of a PRN does not show
+  that.
+
+TODO: settle with a recording of PRN 10 and PRN 7 against a receiver clock disciplined by GNSS,
+which gives each satellite's own carrier offset.
 
 ## Visibility
 
@@ -275,6 +309,25 @@ antenna (RHCP, 2492 MHz) → LNA → band-pass filter 2483.5–2500 MHz → cabl
 - **Never transmit.** This chain only receives. HackRF and USRP are used as receivers here;
   the rules of [Conducted test](conducted-test.md) about transmitting still apply to any
   transmission.
+
+### Practical notes from the first sky recording
+
+From [First NavIC S-band acquisition from the sky](../results/sky-first-acquisition.md), where
+earlier attempts that ignored these points gave no detection:
+
+- **Set the GQRX "Bandwidth" to the sample rate.** With 0, outside signals appeared only in a
+  narrow part of the band around the tune frequency (*inferred*: the analog filter was at its
+  minimum). The NavIC signal is then lost when it is not at the tune frequency.
+- **Connect the B210 directly to the computer, not through a USB hub.** Through a hub, a comb
+  of narrow lines appeared in the spectrum; connected directly, it did not.
+- **Power the LNA from a battery.** The first detections were made this way. A supply from
+  the computer's USB could bring the same kind of interference into the LNA as the hub did.
+  This is an *inference*; a comparison was not recorded.
+- **Keep the antenna away from USB cables,** for the same reason (*inference*).
+- **GQRX recordings.** The `_fc.raw` files written by GQRX's I/Q recorder are complex 32-bit
+  floats: convert them with `snappnt convert --format uhd-float`. The file name carries the
+  hardware tune frequency and the sample rate
+  (`gqrx_<date>_<time>_<frequency>_<rate>_fc.raw`). Pass that frequency to `--freq-hz`.
 
 ## Candidate parts
 

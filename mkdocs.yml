@@ -70,6 +70,7 @@ nav:
       - ESP32-C3 bench checks: results/esp32c3-bench-no-rf.md
       - DC offset removal: results/dc-removal.md
       - Conducted test (M3): results/conducted-m3.md
+      - First sky acquisition: results/sky-first-acquisition.md
   - Project:
       - Milestones: project/milestones.md
       - Decision log: project/decisions.md
