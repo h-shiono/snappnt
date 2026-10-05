@@ -473,13 +473,49 @@ usually within some milliseconds of UTC; this is a typical value, not measured h
 3. **Reference receiver first.** Record with a HackRF or USRP through the same antenna, LNA
    and filter: a few seconds at 4 to 8 MSa/s centred near 2492 MHz. Acquire with a long
    snapshot and a frequency search covering the receiver's crystal error. Record the
-   detected PRNs and the estimated C/N0.
+   detected PRNs and the estimated C/N0. The options for this are in "Acquiring a long
+   recording" below.
 4. **ESP32 receivers.** With the same chain, capture with `snappnt capture` and acquire. On
    the ESP32-C3 expect no detection at the ICD minimum power (see the link budget); on the
    ESP32-C61, capture 4 ms at 4 MSa/s when long captures are available (milestone M4).
 5. Write the result as a page under [Results](../results/index.md): C/N0 found by each
    receiver, detection or not, and the comparison with this page's estimates. No receiver
    position is written.
+
+### Acquiring a long recording
+
+A recording of several seconds is acquired in segments of up to about 1 s, with
+non-coherent integration over many 4 ms blocks. Two options of `snappnt acquire` are made for
+this, as used in
+[First NavIC S-band acquisition from the sky](../results/sky-first-acquisition.md):
+
+```bash
+uv run snappnt acquire out/sky/rec --signal navic_s_sps --center <offset_hz> --code-doppler \
+    --freq-span 30000 --start-s 1 --duration-s 1 --blocks 250
+```
+
+- **`--code-doppler`** (GitHub issue #72). A carrier offset f also changes the code rate, by the
+  factor f / 2492.028 MHz. Over 1 s, an offset of 10 kHz moves the code by about 4 chips. This
+  option scales the replica's chip rate with the frequency bin, in groups of bins, so that the
+  code stays aligned over the whole segment.
+  - It is for direct reception only, where one clock drives the LO and the sample clock, as
+    with a HackRF, a USRP or an ESP32.
+  - With an external mixer, an LO error moves the carrier without changing the code rate.
+    `snappnt acquire` and `snappnt sweep` refuse the option when the frequency plan has an
+    external LO.
+- **`--start-s` and `--duration-s`** (GitHub issue #73) select a segment of the recording, in
+  seconds from its first sample. Only that segment is read from the file.
+  - The reported code phase refers to the first sample of the segment, not of the file.
+  - For a simulated recording, the truth is compared only when the segment starts at the
+    first sample.
+- **`--center`** is where the carrier sits in the recording's baseband with zero Doppler and
+  zero clock error: 2492.028 MHz minus the tune frequency. For example, 2028500 Hz for a
+  recording tuned to 2489.9995 MHz.
+- Frequency refinement is off in `snappnt acquire`. Carrier offsets are reported on the bin
+  grid (125 Hz for 4 ms blocks) and code phases on the sample grid.
+- Narrow interference lines can make every PRN read as detected on a real recording. Check
+  the threshold with codes that are not transmitted at S band, such as the NavIC L5 codes
+  (`--signal navic_l5_sps`), and see GitHub issue #80.
 
 ## Open decisions (maintainer)
 

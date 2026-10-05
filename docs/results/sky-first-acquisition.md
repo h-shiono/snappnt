@@ -79,6 +79,18 @@ notch, no frequency shift, no decimation and no removal of narrow lines. The thr
 `snappnt acquire` is 1.4 for 1 s (1.444 with ±30 kHz, read from `snappnt.rx.acquire`) and 2.1
 for 0.2 s.
 
+Options used:
+
+- `--code-doppler` (GitHub issue #72) scales the replica's chip rate with the frequency bin, in
+  groups of bins. It assumes direct reception, with one clock for the LO and the sample clock,
+  as with the B210 clone here. `snappnt acquire` refuses it when the recording's frequency plan
+  has an external LO, because an LO error then moves the carrier without changing the code rate.
+- `--start-s` and `--duration-s` (GitHub issue #73) select a segment of the recording. The
+  reported code phase refers to the first sample of that segment, not of the file. For a
+  simulated recording, the truth is compared only when the segment starts at the first sample.
+- Frequency refinement was off (`refine=False`, the default of `snappnt acquire`). Carrier
+  offsets are therefore reported on the 125 Hz bin grid, and code phases on the sample grid.
+
 ## Results
 
 ### The threshold does not hold on this recording
@@ -109,8 +121,8 @@ Seventeen 1 s windows (±15 kHz) between 1 s and 31 s:
   and 25 s.
 - **PRN 7 is lower but consistent.** Its metric is 1.5 to 3 times the noise-only level, its
   carrier offset stays in the same bin in all 17 windows, and its code phase follows the
-  predicted drift (next section). A single window alone would be weak evidence; the 17
-  together are not consistent with noise.
+  predicted drift ("Per-window results" below). A single window alone would be weak
+  evidence; the 17 together are not consistent with noise.
 - **Not explained:** PRN 10 with 0.2 s starting at 0.5 s gives a carrier offset of +7750 Hz,
   against +9500 Hz in every other window. A disturbance in the first second of the
   recording (receiver settling, or an earlier sample drop) is an inference, not checked.
@@ -150,6 +162,42 @@ phase, since `snappnt acquire` does not interpolate between samples. The smaller
 PRN 10 is not a finer resolution: its drift over 2 s, 7.80 chips, happens to be close to a
 whole number of samples (61).
 
+### Per-window results
+
+All windows are 1 s (250 blocks of 4 ms), searched over ±15 kHz with code-Doppler compensation.
+
+- *Bin* is the carrier offset of the grid peak.
+- *Deviation* is the code phase found minus the code phase predicted from the window starting at
+  1 s and the drift above, in chips. It is relative to that first window, so it shows no
+  absolute code phase.
+- PRN 5 is listed for comparison: its bin is not stable from window to window.
+
+| Window start [s] | PRN 10 bin [Hz] | PRN 10 metric | PRN 10 deviation [chip] | PRN 7 bin [Hz] | PRN 7 metric | PRN 7 deviation [chip] | PRN 5 bin [Hz] | PRN 5 metric |
+|---|---|---|---|---|---|---|---|---|
+| 1 | +9500 | 10.7 | +0.00 | +6250 | 3.6 | +0.00 | +11625 | 2.0 |
+| 3 | +9500 | 11.1 | +0.00 | +6250 | 3.8 | −0.02 | +11625 | 1.6 |
+| 5 | +9500 | 11.0 | +0.00 | +6250 | 3.3 | −0.03 | +11625 | 1.5 |
+| 7 | +9500 | 12.6 | +0.00 | +6250 | 4.3 | −0.05 | +11625 | 1.6 |
+| 9 | +9500 | 11.7 | +0.00 | +6250 | 4.2 | −0.07 | +11625 | 1.5 |
+| 11 | +9500 | 13.6 | +0.00 | +6250 | 4.7 | −0.09 | +11625 | 1.5 |
+| 13 | +9500 | 12.4 | +0.00 | +6250 | 5.2 | −0.10 | +6000 | 1.5 |
+| 15 | +9500 | 10.6 | +0.00 | +6250 | 3.9 | −0.12 | +3000 | 1.4 |
+| 17 | +9500 | 12.5 | +0.00 | +6250 | 4.3 | −0.00 | +3000 | 1.5 |
+| 19 | +9500 | 9.9 | +0.00 | +6250 | 3.5 | −0.02 | +14000 | 1.5 |
+| 21 | +9500 | 11.8 | +0.00 | +6250 | 4.5 | −0.03 | +14000 | 1.5 |
+| 23 | +9500 | 8.9 | +0.00 | +6250 | 3.4 | −0.05 | +6000 | 1.4 |
+| 25 | +9500 | 9.0 | +0.00 | +6250 | 3.4 | −0.07 | +3000 | 1.4 |
+| 27 | +9500 | 6.9 | +0.00 | +6250 | 2.8 | −0.09 | +3000 | 1.5 |
+| 28 | +9500 | 9.4 | +323.72 | +6250 | 3.0 | +323.69 | +6000 | 1.4 |
+| 29 | +9500 | 11.6 | +323.78 | +6250 | 3.6 | +323.68 | +3000 | 1.4 |
+| 30 | +9500 | 13.8 | +323.72 | +6250 | 5.6 | +323.68 | +11625 | 1.6 |
+
+The PRN 7 deviation falls step by step to −0.12 chip and returns to 0 at 17 s. This sawtooth is
+what one-sample resolution gives. The predicted drift over 2 s is 5.13 chips, or 40.1 samples,
+while the reported code phase moves in whole samples. The deviation therefore grows by about
+0.1 sample per window, until the reported code phase moves by one sample more. For PRN 10 the
+drift over 2 s is 60.98 samples, close to a whole number, so its deviation stays near 0.
+
 This check does not tell a satellite oscillator error from a receiver clock error: both change
 the carrier and the code rate in the same ratio.
 
@@ -182,8 +230,8 @@ whole number of code periods (8000 samples each).
   - One residual remains: S-band PRN 2 stays slightly above the threshold with line removal at
     8 MSa/s (1.456). Whether band-limiting before decimation also matters is not settled.
 
-The missing step, removing narrow lines or estimating the noise floor robustly, is proposed
-as a new issue in issue #74. PRN 5 is IRNSS-1E per
+The missing step, removing narrow lines or estimating the noise floor robustly, is GitHub
+issue [#80](https://github.com/h-shiono/snappnt/issues/80). PRN 5 is IRNSS-1E per
 [IGSMAIL-7272](https://lists.igs.org/pipermail/igsmail/2016/001106.html).
 
 ## Earlier attempts
@@ -246,5 +294,5 @@ recording through a band-pass filter.
 - The satellite behind PRN 7 (IRNSS-1G is inferred) and behind PRN 10 (NVS-01 per secondary
   sources only).
 - The bias of the C/N0 estimate for 250 blocks of 4 ms on a recording with narrow lines.
-- PRN 5 with `snappnt` commands alone (pending the new issue on narrow-line removal).
+- PRN 5 with `snappnt` commands alone (pending GitHub issue #80 on narrow lines).
 - The cause of the different carrier offset of PRN 10 in the 0.2 s window starting at 0.5 s.
