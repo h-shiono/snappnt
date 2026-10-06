@@ -76,6 +76,7 @@ nav:
       - DC offset removal: results/dc-removal.md
       - Conducted test (M3): results/conducted-m3.md
       - First sky acquisition: results/sky-first-acquisition.md
+      - Sky, ESP32-C5 (preliminary): results/sky-esp32c5-preliminary.md
   - Project:
       - Milestones: project/milestones.md
       - Decision log: project/decisions.md

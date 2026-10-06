@@ -1,0 +1,19 @@
+# ESP32-C5 sky test conditions (docs/results/sky-esp32c5-preliminary.md): 4 MSa/s obtained by
+# keeping every 20th sample of 80 MSa/s (the ESP32-C5 does not band-limit at low rates, issue #78),
+# analog bandwidth 11 MHz (BANDWIDTH 11), 16 380 samples, no clock error (the narrow search is
+# centred on the signal, as in the measurement). There is no ESP32-C5 device file yet (#78): the
+# ESP32-C61 device supplies the 10-bit quantisation and the capture limit; the other receiver
+# fields are set here.
+name: navic_s_esp32c5_4msps_b11
+signal: navic_s_sps
+seed: 5
+receiver:
+  device: esp32c61
+  sample_rate_hz: 4000000
+  n_samples: 16380
+  clock_offset_ppm: 0.0
+  generate_rate_hz: 80000000
+  analog_bandwidth_hz: 11000000
+  decimation: {factor: 20, method: none}
+satellites:
+  - {prn: 10, cn0_dbhz: 40, doppler_hz: 0, code_phase_chips: 55.0}

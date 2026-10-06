@@ -12,6 +12,9 @@ are not recorded on this page, because together they would reveal where the rece
 ([Public-safety rules](../development/public-safety.md)). The recording itself is not
 published.
 
+A later, preliminary acquisition with an ESP32-C5 behind a 45 cm dish is on
+[NavIC S-band from the sky on an ESP32-C5 (preliminary)](sky-esp32c5-preliminary.md).
+
 Terms used on this page:
 
 - *C/N0:* carrier-to-noise density ratio in dB-Hz.
@@ -247,7 +250,10 @@ Earlier recordings gave no detection. What was observed, and what is inferred:
   lines appeared in the spectrum. It disappeared when the B210 clone was connected directly to
   the computer.
 - **Observed:** a horizontal rod antenna gave no detection with 1 s, with or without the LNA.
-  The cause is not known.
+  **Found later (2026-10-06):** the rod antenna has an RP-SMA plug, whose centre is a socket
+  like the SMA jacks of the receiver and the LNA, so its centre conductor never connected. With
+  an RP-SMA-to-SMA adapter the same antenna works; see
+  [Earlier attempt with the same rod antenna](sky-esp32c5-preliminary.md#earlier-attempt-with-the-same-rod-antenna).
 
 ## Comparison with the link budget
 

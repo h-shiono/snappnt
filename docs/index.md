@@ -11,8 +11,11 @@ checked automatically against known truth.
     Research software, early stage. The receive chain has been verified in a conducted test
     (cables and attenuators, nothing radiated). **NavIC S-band SPS has been received from the
     sky with a B210-class SDR**
-    ([first sky acquisition](results/sky-first-acquisition.md)). **Acquisition from the sky
-    with an ESP32 has not been shown yet.** Not affiliated with ESPARGOS or Espressif.
+    ([first sky acquisition](results/sky-first-acquisition.md)). In a preliminary experiment
+    with equipment at hand, an ESP32-C5 acquired NavIC S-band PRN 10 from the sky behind a
+    45 cm dish in single 4.1 ms snapshots
+    ([preliminary ESP32-C5 result](results/sky-esp32c5-preliminary.md)); a measurement with a
+    dedicated feed is being prepared. Not affiliated with ESPARGOS or Espressif.
 
 ## Why snapshots
 
