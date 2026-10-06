@@ -149,9 +149,9 @@ Selected values (the CSV has every point from 34 to 50 dB-Hz):
 `p_detect` counts captures above the threshold at the true cell (code phase within 0.5 chip,
 frequency within one step) and `p_wrong` those above the threshold at another cell. Under noise
 alone the mean metric is about 11.5, the expected maximum over the grid. `p_detect` stays at 0.93
-to 0.97 above 44 dB-Hz because 3 to 7 % of the captures are detected at a wrong cell: a sign
-change of the navigation data inside the 4.1 ms block can move the correlation peak by more than
-one frequency step. It does not bring the metric down to the noise level; `p_detect + p_wrong`
+to 0.97 above 44 dB-Hz because 3 to 7 % of the captures are detected at a wrong cell. The likely
+cause, not checked in the simulation, is a sign change of the navigation data inside the 4.1 ms
+block, which can move the correlation peak by more than one frequency step. It does not bring the metric down to the noise level; `p_detect + p_wrong`
 reaches 1.00 from 46 dB-Hz. Since the measured detections are not checked against a cell, they
 correspond to `p_detect + p_wrong`.
 
@@ -162,14 +162,17 @@ below the noise in each capture, so selecting captures by their total power does
 by signal strength. Their detection rate was inverted on the `p_detect + p_wrong` curve. For
 comparison, the estimates from all 50 captures are kept: from the detection rate (inverted on
 `p_detect`; on `p_detect + p_wrong` they change by at most 0.08 dB) and from the mean metric.
-Those read low, because captures hit by interference count as misses and lower the mean metric.
+The detection-rate column reads 0.1 to 1.2 dB below the main estimate, because captures hit by
+interference count as misses. The mean-metric column agrees with the main estimate within 0.2 dB
+in the five sets where both are given (14:59 −0.2, 15:05 +0.1, 15:08 0.0, 15:11 −0.1,
+15:12 0.0 dB); why it is not lowered in the same way was not examined.
 
 | Set | Captures without interference | Detected among them | C/N0, captures without interference (main) | C/N0, all 50, from detection rate | C/N0, all 50, from mean metric |
 |---|---|---|---|---|---|
 | 14:59 no reflector | 39 | 11 | 40.8 dB-Hz | 40.3 dB-Hz | 40.6 dB-Hz |
 | 15:05 disc placed | 46 | 15 | 41.1 dB-Hz | 41.0 dB-Hz | 41.2 dB-Hz |
 | 15:08 disc held | 42 | 32 | 43.3 dB-Hz | 42.7 dB-Hz | 43.3 dB-Hz |
-| 15:10 disc held | 33 | 33 | 46 dB-Hz or more (flat part of the curve) | — (flat part of the curve) | 47.1 dB-Hz |
+| 15:10 disc held | 33 | 33 | about 43.9 dB-Hz or more (one-sided 95 %; 33 of 33 detected) | 43.5 dB-Hz | 47.1 dB-Hz |
 | 15:11 hand only | 35 | 30 | 43.7 dB-Hz | 42.5 dB-Hz | 43.6 dB-Hz |
 | 15:12 no reflector | 39 | 23 | 42.5 dB-Hz | 41.8 dB-Hz | 42.5 dB-Hz |
 
@@ -179,6 +182,14 @@ example 11/50 = 0.22 ± 0.06, about ±0.5 dB near 40 to 41 dB-Hz. These ranges c
 side only. Each simulated point is also the result of 100 trials (for example 0.31 ± 0.05 at
 41 dB-Hz and 0.70 ± 0.05 at 43 dB-Hz), which adds about ±0.2 to ±0.4 dB between 40 and 44 dB-Hz.
 The two contributions are not combined here.
+
+For the 15:10 set, 33 of 33 detected captures give only a lower bound: the one-sided 95 % lower
+bound on the rate is 0.05^(1/33) ≈ 0.913, which lies at about 43.9 dB-Hz on the
+`p_detect + p_wrong` curve (linear interpolation between 43 and 44 dB-Hz). At 44 dB-Hz the
+probability of 33 of 33 is about 0.13. The detection rate cannot separate higher values, because
+the curve is close to 1 above 44 dB-Hz. The mean metric of the 33 captures without interference
+(74.3), inverted on the simulated mean-metric curve, gives about 48.1 dB-Hz (computed by the
+maintainer from the captures).
 
 ## Inferences
 
@@ -201,9 +212,12 @@ The two contributions are not combined here.
   through the same dish had interference bursts in under 1 % of the time. A 4.1 ms capture
   counts as hit if a short burst falls anywhere inside it, so the per-capture rate is much higher
   than the fraction of time; the two numbers are not directly comparable.
-- Reflector: without interference, the hand-only set (15:11, about 43.7 dB-Hz) is above the
-  disc-held set at 15:08 (about 43.3 dB-Hz). Apart from the 15:10 set (46 dB-Hz or more), the
-  reflector cannot be told apart from the hand alone with these measurements. The disc was held
+- Reflector: without interference, the hand-only set (15:11, about 43.7 dB-Hz, ±1 standard
+  deviation 43.4 to 43.9 dB-Hz) is above the disc-held set at 15:08 (about 43.3 dB-Hz). The 15:10
+  set is the only one whose evidence points higher: its detection rate gives about 43.9 dB-Hz or
+  more, the mean metric of all 50 captures 47.1 dB-Hz and that of the 33 captures without
+  interference about 48.1 dB-Hz. By the detection rate alone it is barely separated from the
+  hand-only set. These measurements do not establish the reflector's effect. The disc was held
   by hand and its position was not repeatable.
 
 ## Earlier attempt with the same rod antenna
@@ -222,7 +236,7 @@ before connecting one to an SMA receiver.
 - **Fixed reflector.** A reflector a quarter wavelength (3.0 cm at 2492 MHz) behind a linear
   element turns the element's rear response towards the dish (a dipole with a reflector), which
   can give up to about 3 dB. This is the reason to try a reflector fixed at that distance; these
-  measurements do not show its effect apart from the 15:10 set.
+  measurements do not establish its effect.
 - The rod antenna loses about 3 dB on the circularly polarised signal; a left-hand circularly
   polarised feed would recover these 3 dB.
 

@@ -63,7 +63,7 @@ detect the signal. These are estimates; they and the sky test plan are in
 
 A preliminary experiment then put a 45 cm dish in front of the amplifier. Behind it, an
 ESP32-C5 with 4.1 ms snapshots at 4 MSa/s acquired PRN 10 in single captures; without a
-reflector, the C/N0 at its input was about 40.8 to 42.5 dB-Hz
+reflector, the C/N0 at its input was estimated at about 40.8 to 42.5 dB-Hz
 ([preliminary ESP32-C5 result](docs/results/sky-esp32c5-preliminary.md)). This does not apply
 to the ESP32-C3: a single 0.2 ms capture needs about 50 dB-Hz for 50 % detection, and the
 ESP32-C3 has not been shown from the sky.
