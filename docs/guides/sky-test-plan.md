@@ -356,6 +356,14 @@ buying.
 - A linear antenna loses about 3 dB against the circularly polarised signal. A left-hand
   circularly polarised antenna loses far more; check the polarisation of any antenna reused
   from another 2.4 GHz application.
+- **Check the connector for a centre pin.** Antennas sold for 2.4 GHz Wi-Fi often have
+  RP-SMA (reverse-polarity SMA) connectors. An RP-SMA plug has a socket at its centre instead
+  of a pin, so on an SMA jack the centre conductor is not connected and no signal arrives.
+  Before connecting such an antenna to an SMA receiver or amplifier, check that its plug has a
+  centre pin. If it does not, use an adapter with an RP-SMA female (jack) end for the antenna
+  and an SMA male (plug) end for the receiver; an adapter of the opposite orientation does not
+  mate. A rod antenna with an RP-SMA plug gave no detection for this reason; see
+  [Earlier attempt with the same rod antenna](../results/sky-esp32c5-preliminary.md#earlier-attempt-with-the-same-rod-antenna).
 - Makers of NavIC receivers that support S-band may supply an antenna with their kits; no
   datasheet was found.
 
