@@ -360,8 +360,9 @@ buying.
   RP-SMA (reverse-polarity SMA) connectors. An RP-SMA plug has a socket at its centre instead
   of a pin, so on an SMA jack the centre conductor is not connected and no signal arrives.
   Before connecting such an antenna to an SMA receiver or amplifier, check that its plug has a
-  centre pin, and use an RP-SMA-to-SMA adapter if it does not. A rod antenna with an RP-SMA
-  plug gave no detection for this reason; see
+  centre pin. If it does not, use an adapter with an RP-SMA female (jack) end for the antenna
+  and an SMA male (plug) end for the receiver; an adapter of the opposite orientation does not
+  mate. A rod antenna with an RP-SMA plug gave no detection for this reason; see
   [Earlier attempt with the same rod antenna](../results/sky-esp32c5-preliminary.md#earlier-attempt-with-the-same-rod-antenna).
 - Makers of NavIC receivers that support S-band may supply an antenna with their kits; no
   datasheet was found.
