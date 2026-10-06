@@ -38,6 +38,8 @@ SCENARIO_HASHES = {
     "navic_s_esp32c61_aliasing_none": "b6dd63aee96f713d39d246efcab92a81b25cc8be1d459c5b338945a3b8a17ec0",
     "navic_s_esp32c61_aliasing_none_b20": "cde8024aaba18f036c363b3c40f1f95af7c53f4ad06f92d339ff2eb3cc70cd4f",
     "navic_s_ideal": "9e88ebaa177e7a32100cccd4bc185c8ddf1856ce773433af93ad5d727c9740cf",
+    # Added with the scenario for the ESP32-C5 sky result (issue #87), hashed when it was added.
+    "navic_s_esp32c5_4msps_b11": "208073476801a6058e7462bbe2500d17c0d077be1603a6e422b1d7d58d4e4a29",
 }
 
 

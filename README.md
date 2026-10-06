@@ -13,8 +13,11 @@ radio can receive without a mixer.
 > **Status:** research software, early stage. The receive chain has been verified in a
 > conducted test (cables and attenuators, nothing radiated). **NavIC S-band SPS has been
 > received from the sky with a B210-class SDR**
-> ([first sky acquisition](docs/results/sky-first-acquisition.md)). **Acquisition from the sky
-> with an ESP32 has not been shown yet.** Not affiliated with ESPARGOS or Espressif.
+> ([first sky acquisition](docs/results/sky-first-acquisition.md)). In a preliminary experiment
+> with equipment at hand, an ESP32-C5 acquired NavIC S-band PRN 10 from the sky behind a 45 cm
+> dish in single 4.1 ms snapshots
+> ([preliminary ESP32-C5 result](docs/results/sky-esp32c5-preliminary.md)); a measurement with
+> a dedicated feed is being prepared. Not affiliated with ESPARGOS or Espressif.
 
 ## What has been shown so far
 
@@ -57,6 +60,13 @@ estimated C/N0 of 32 to 35 dB-Hz is below the 50 % point of every simulated ESP3
 (37.8 dB-Hz and above), so an ESP32 behind the same antenna and amplifier is not expected to
 detect the signal. These are estimates; they and the sky test plan are in
 [Sky test plan](docs/guides/sky-test-plan.md).
+
+A preliminary experiment then put a 45 cm dish in front of the amplifier. Behind it, an
+ESP32-C5 with 4.1 ms snapshots at 4 MSa/s acquired PRN 10 in single captures; without a
+reflector, the C/N0 at its input was about 40.8 to 42.5 dB-Hz
+([preliminary ESP32-C5 result](docs/results/sky-esp32c5-preliminary.md)). This does not apply
+to the ESP32-C3: a single 0.2 ms capture needs about 50 dB-Hz for 50 % detection, and the
+ESP32-C3 has not been shown from the sky.
 
 ## Targets
 

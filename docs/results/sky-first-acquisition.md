@@ -12,6 +12,9 @@ are not recorded on this page, because together they would reveal where the rece
 ([Public-safety rules](../development/public-safety.md)). The recording itself is not
 published.
 
+A later, preliminary acquisition with an ESP32-C5 behind a 45 cm dish is on
+[NavIC S-band from the sky on an ESP32-C5 (preliminary)](sky-esp32c5-preliminary.md).
+
 Terms used on this page:
 
 - *C/N0:* carrier-to-noise density ratio in dB-Hz.

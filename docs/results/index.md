@@ -16,5 +16,6 @@ Recorded pages:
 | [Removing the DC offset before acquisition](dc-removal.md) | #43 |
 | [Conducted test of NavIC S-band SPS on the XIAO ESP32C3](conducted-m3.md) | #11 |
 | [First NavIC S-band acquisition from the sky](sky-first-acquisition.md) | #74 |
+| [NavIC S-band from the sky on an ESP32-C5 (preliminary)](sky-esp32c5-preliminary.md) | #87 |
 
 When adding a page, also add it to the `nav` section of `mkdocs.yml`.
