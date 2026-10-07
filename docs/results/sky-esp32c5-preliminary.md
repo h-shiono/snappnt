@@ -30,6 +30,14 @@ ESP32-C5 settings: `FREQ 2492` (NavIC S at +28 kHz), 4 MSa/s, 16 380 samples per
 The dish and the feed were not moved between the last reference measurement and the ESP32-C5
 captures; only the receiver cable was moved from the B210 clone to the ESP32-C5.
 
+The two photographs below were taken indoors after the measurement. The tilt of the dish in
+them is not the pointing used in the measurement, and the amplifier is not connected to its
+battery or to a receiver.
+
+![The 45 cm offset dish on a camera tripod, in its normal orientation with the feed arm below the dish. At the end of the arm, a home-made mount holds the rod antenna across the focal point, with the Nooelec LaNA attached directly to the antenna.](sky-esp32c5-setup.jpg)
+
+![Close-up of the feed: the rod antenna lies on the home-made mount at the end of the feed arm, its connector screwed onto the Nooelec LaNA; a coaxial cable leaves the other side of the amplifier.](sky-esp32c5-feed.jpg)
+
 ## Pointing the dish with the reference receiver
 
 The B210 clone recorded through the same feed and amplifier. PRN 10 and PRN 7 were acquired in
